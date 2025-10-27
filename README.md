@@ -7,7 +7,7 @@ This repository contains the configuration and metadata for Solution Groups and 
 Two GitHub Actions workflows manage the Solution Groups:
 
 1. **Deploy Solution** (`DeploySolution.yml`) - Deploys applications and shows their configuration
-2. **Extract Solution** (`ExtractSolution.yml`) - Updates application metadata with timestamps and commits changes
+2. **Extract Solution** (`ExportSolution.yml`) - Updates application metadata with timestamps and commits changes
 
 Both workflows support **cascading/dependent workflow triggering**, allowing automatic deployment or extraction of dependent applications.
 
@@ -117,7 +117,7 @@ Here is the end result after all deployments are done:
 
 ### 2. Extract Solution Workflow
 
-**File:** `.github/workflows/ExtractSolution.yml`
+**File:** `.github/workflows/ExportSolution.yml`
 
 **Purpose:** Update application metadata and commit changes
 
@@ -237,7 +237,7 @@ Update **both** workflow files to include the new solution group options:
 
 **Files to update:**
 - `.github/workflows/DeploySolution.yml`
-- `.github/workflows/ExtractSolution.yml`
+- `.github/workflows/ExportSolution.yml`
 
 **Add these lines to the `options` section:**
 
@@ -327,7 +327,7 @@ Update **both** workflow files:
 
 **Files to update:**
 - `.github/workflows/DeploySolution.yml`
-- `.github/workflows/ExtractSolution.yml`
+- `.github/workflows/ExportSolution.yml`
 
 **Add the new option:**
 
@@ -423,7 +423,7 @@ This ensures that configuration issues are caught early while allowing flexibili
 - You can safely check "Trigger dependent workflows" for any app without worrying about this
 
 ### New app doesn't appear in dropdown
-- Ensure you updated **both** workflow files (`.github/workflows/DeploySolution.yml` and `ExtractSolution.yml`)
+- Ensure you updated **both** workflow files (`.github/workflows/DeploySolution.yml` and `ExportSolution.yml`)
 - Commit and push the workflow changes
 - Refresh the Actions page in GitHub
 
