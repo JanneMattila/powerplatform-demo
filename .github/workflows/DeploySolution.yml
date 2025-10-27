@@ -22,7 +22,7 @@ permissions:
   actions: write
 
 jobs:
-  DeploySolution:
+  QA:
     environment: QA
     if: github.ref != 'refs/heads/main'
     name: QA - Deploy ${{ inputs.solution }}
