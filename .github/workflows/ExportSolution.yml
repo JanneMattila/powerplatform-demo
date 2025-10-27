@@ -29,7 +29,6 @@ permissions:
 jobs:
   ExportSolution:
     environment: Development
-    if: github.ref != 'refs/heads/main'
     name: Export ${{ inputs.solution }}
     runs-on: ubuntu-latest
     steps:
