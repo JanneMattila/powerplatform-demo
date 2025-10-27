@@ -24,14 +24,16 @@ permissions:
 jobs:
   ExportSolution:
     environment: Development
+    if: github.ref != 'refs/heads/main'
     name: Export ${{ inputs.solution }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out
         uses: actions/checkout@v5.0.0
-
-      - name: Install Power Platform Tools
-        uses: microsoft/powerplatform-actions/actions-install@v1
+        with:
+          fetch-depth: 1
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1
 
       - name: Parse solution selection
         id: parse
@@ -43,7 +45,22 @@ jobs:
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           echo "Exporting: $SOLUTION_GROUP -> $APP_NAME"
 
-      - name: Export Solution
+      - name: Install Power Platform Tools
+        uses: microsoft/powerplatform-actions/actions-install@v1
+
+      - name: Export unmanaged solution
+        uses: microsoft/powerplatform-actions/export-solution@v1
+        with:
+          environment-url: ${{ secrets.ENVIRONMENT_URL }}
+          app-id: ${{ secrets.CLIENT_ID }}
+          client-secret: ${{ secrets.CLIENT_SECRET }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          solution-name: ${{ steps.parse.outputs.app_name }}
+          solution-output-file: '${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}_unmanaged.zip'
+          working-directory: './SolutionGroups/'
+          managed: false
+
+      - name: Export managed solution
         uses: microsoft/powerplatform-actions/export-solution@v1
         with:
           environment-url: ${{ secrets.ENVIRONMENT_URL }}
@@ -53,153 +70,118 @@ jobs:
           solution-name: ${{ steps.parse.outputs.app_name }}
           solution-output-file: '${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}.zip'
           working-directory: './SolutionGroups/'
+          managed: true
 
-      # - name: Export Application
-      #   run: |
-      #     echo "Exporting ${{ steps.parse.outputs.app_name }} from solution group ${{ steps.parse.outputs.solution_group }}"
-      #     echo "Exporting from ref: ${{ github.ref }}"
-      #     echo "Current commit: ${{ github.sha }}"
-      #     echo ""
+      - name: Commit changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           
-      #     APP_FILE="./SolutionGroups/${{ steps.parse.outputs.solution_group }}-SolutionGroup/${{ steps.parse.outputs.app_name }}.md"
-      #     TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-      #     USERNAME="${{ github.actor }}"
-          
-      #     echo "=========================================="
-      #     echo "Updating Application Configuration:"
-      #     echo "=========================================="
-          
-      #     if [ -f "$APP_FILE" ]; then
-      #       # Update the header with timestamp and username
-      #       sed -i "1s/.*/# ${{ steps.parse.outputs.solution_group }}-SolutionGroup -> ${{ steps.parse.outputs.app_name }} - Update $TIMESTAMP by $USERNAME/" "$APP_FILE"
+          git add .
             
-      #       echo "Updated file: $APP_FILE"
-      #       echo ""
-      #       echo "New content:"
-      #       cat "$APP_FILE"
-      #     else
-      #       echo "Error: Configuration file not found at: $APP_FILE"
-      #       exit 1
-      #     fi
-          
-      #     echo "=========================================="
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            # Commit the changes first
+            git commit -m "Export of ${{ inputs.solution }} - Updated by ${{ github.actor }}"
+            
+            # Retry logic for push conflicts
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            RETRY_DELAY=5
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES to push changes"
+              
+              # Try to push
+              if git push; then
+                echo "Changes pushed successfully"
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "Push failed, pulling latest changes and retrying..."
+                  
+                  # Pull with rebase to get latest changes
+                  if git pull --rebase origin ${{ github.ref_name }}; then
+                    echo "Rebased successfully, waiting $RETRY_DELAY seconds before retry..."
+                    sleep $RETRY_DELAY
+                    RETRY_DELAY=$((RETRY_DELAY + 5))  # Exponential backoff
+                  else
+                    echo "Rebase failed, trying to abort and continue..."
+                    git rebase --abort || true
+                    sleep $RETRY_DELAY
+                    RETRY_DELAY=$((RETRY_DELAY + 5))
+                  fi
+                else
+                  echo "Failed to push after $MAX_RETRIES attempts"
+                  exit 1
+                fi
+              fi
+            done
+          fi
 
-      # - name: Commit changes
-      #   run: |
-      #     git config --local user.email "github-actions[bot]@users.noreply.github.com"
-      #     git config --local user.name "github-actions[bot]"
-          
-      #     APP_FILE="./SolutionGroups/${{ steps.parse.outputs.solution_group }}-SolutionGroup/${{ steps.parse.outputs.app_name }}.md"
-          
-      #     if [ -f "$APP_FILE" ]; then
-      #       git add "$APP_FILE"
+      - name: Trigger dependent workflows (optional)
+        if: ${{ success() && inputs.trigger_dependent_workflows }}
+        uses: actions/github-script@v7
+        env:
+          TARGET_REF: ${{ github.ref }}
+          TRIGGER_DEPENDENT_WORKFLOWS: ${{ inputs.trigger_dependent_workflows }}
+          SOLUTION_SELECTION: ${{ inputs.solution }}
+        with:
+          script: |
+            const fs = require('fs');
             
-      #       if git diff --staged --quiet; then
-      #         echo "No changes to commit"
-      #       else
-      #         # Commit the changes first
-      #         git commit -m "Extract ${{ inputs.solution }} - Updated by ${{ github.actor }}"
+            // Parse the solution selection
+            const selection = process.env.SOLUTION_SELECTION;
+            const [solutionGroup, , ...appNameParts] = selection.split(' ');
+            const appName = appNameParts.join(' ');
+            
+            console.log(`Processing dependencies for: ${solutionGroup} -> ${appName}`);
+            
+            // Read the solution groups mapping
+            const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
+            
+            // Get dependent apps for the selected solution
+            if (!solutionGroups[solutionGroup]) {
+              console.log(`Solution group '${solutionGroup}' not found in mapping`);
+              return;
+            }
+            
+            if (!solutionGroups[solutionGroup][appName]) {
+              console.log(`App '${appName}' not found in solution group '${solutionGroup}'`);
+              return;
+            }
+            
+            const dependentApps = solutionGroups[solutionGroup][appName];
+            
+            if (dependentApps.length === 0) {
+              console.log(`No dependent workflows to trigger for ${appName} - this app has no dependencies defined.`);
+              return;
+            }
+            
+            console.log(`Found ${dependentApps.length} dependent app(s): ${dependentApps.join(', ')}`);
+            
+            // Process each dependent app
+            for (const dependentApp of dependentApps) {
+              const dependentSelection = `${solutionGroup} -> ${dependentApp}`;
+              console.log(`Triggering workflow for: ${dependentSelection}`);
               
-      #         # Retry logic for push conflicts
-      #         MAX_RETRIES=5
-      #         RETRY_COUNT=0
-      #         RETRY_DELAY=5
-              
-      #         while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-      #           echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES to push changes"
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: 'ExportSolution.yml',
+                  ref: process.env.TARGET_REF,
+                  inputs: {
+                    solution: dependentSelection,
+                    trigger_dependent_workflows: String(process.env.TRIGGER_DEPENDENT_WORKFLOWS)
+                  }
+                });
                 
-      #           # Try to push
-      #           if git push; then
-      #             echo "Changes pushed successfully"
-      #             break
-      #           else
-      #             RETRY_COUNT=$((RETRY_COUNT + 1))
-      #             if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
-      #               echo "Push failed, pulling latest changes and retrying..."
-                    
-      #               # Pull with rebase to get latest changes
-      #               if git pull --rebase origin ${{ github.ref_name }}; then
-      #                 echo "Rebased successfully, waiting $RETRY_DELAY seconds before retry..."
-      #                 sleep $RETRY_DELAY
-      #                 RETRY_DELAY=$((RETRY_DELAY + 5))  # Exponential backoff
-      #               else
-      #                 echo "Rebase failed, trying to abort and continue..."
-      #                 git rebase --abort || true
-      #                 sleep $RETRY_DELAY
-      #                 RETRY_DELAY=$((RETRY_DELAY + 5))
-      #               fi
-      #             else
-      #               echo "Failed to push after $MAX_RETRIES attempts"
-      #               exit 1
-      #             fi
-      #           fi
-      #         done
-      #       fi
-      #     else
-      #       echo "Skipping commit - file not found"
-      #     fi
-
-      # - name: Trigger dependent workflows (optional)
-      #   if: ${{ success() && inputs.trigger_dependent_workflows }}
-      #   uses: actions/github-script@v7
-      #   env:
-      #     TARGET_REF: ${{ github.ref }}
-      #     TRIGGER_DEPENDENT_WORKFLOWS: ${{ inputs.trigger_dependent_workflows }}
-      #     SOLUTION_SELECTION: ${{ inputs.solution }}
-      #   with:
-      #     script: |
-      #       const fs = require('fs');
-            
-      #       // Parse the solution selection
-      #       const selection = process.env.SOLUTION_SELECTION;
-      #       const [solutionGroup, , ...appNameParts] = selection.split(' ');
-      #       const appName = appNameParts.join(' ');
-            
-      #       console.log(`Processing dependencies for: ${solutionGroup} -> ${appName}`);
-            
-      #       // Read the solution groups mapping
-      #       const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
-            
-      #       // Get dependent apps for the selected solution
-      #       if (!solutionGroups[solutionGroup]) {
-      #         console.log(`Solution group '${solutionGroup}' not found in mapping`);
-      #         return;
-      #       }
-            
-      #       if (!solutionGroups[solutionGroup][appName]) {
-      #         console.log(`App '${appName}' not found in solution group '${solutionGroup}'`);
-      #         return;
-      #       }
-            
-      #       const dependentApps = solutionGroups[solutionGroup][appName];
-            
-      #       if (dependentApps.length === 0) {
-      #         console.log(`No dependent workflows to trigger for ${appName} - this app has no dependencies defined.`);
-      #         return;
-      #       }
-            
-      #       console.log(`Found ${dependentApps.length} dependent app(s): ${dependentApps.join(', ')}`);
-            
-      #       // Process each dependent app
-      #       for (const dependentApp of dependentApps) {
-      #         const dependentSelection = `${solutionGroup} -> ${dependentApp}`;
-      #         console.log(`Triggering workflow for: ${dependentSelection}`);
-              
-      #         try {
-      #           await github.rest.actions.createWorkflowDispatch({
-      #             owner: context.repo.owner,
-      #             repo: context.repo.repo,
-      #             workflow_id: 'ExtractSolution.yml',
-      #             ref: process.env.TARGET_REF,
-      #             inputs: {
-      #               solution: dependentSelection,
-      #               trigger_dependent_workflows: String(process.env.TRIGGER_DEPENDENT_WORKFLOWS)
-      #             }
-      #           });
-                
-      #           console.log(`Successfully triggered: ${dependentSelection}`);
-      #         } catch (error) {
-      #           console.error(`Failed to trigger ${dependentSelection}:`, error.message);
-      #           // Continue with next workflow instead of failing completely
-      #         }
-      #       }
+                console.log(`Successfully triggered: ${dependentSelection}`);
+              } catch (error) {
+                console.error(`Failed to trigger ${dependentSelection}:`, error.message);
+                // Continue with next workflow instead of failing completely
+              }
+            }

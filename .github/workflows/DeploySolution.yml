@@ -22,12 +22,18 @@ permissions:
   actions: write
 
 jobs:
-  deploy-solution:
+  DeploySolution:
+    environment: QA
+    if: github.ref != 'refs/heads/main'
     name: Deploy ${{ inputs.solution }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out
         uses: actions/checkout@v5.0.0
+        with:
+          fetch-depth: 1
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1
 
       - name: Parse solution selection
         id: parse
@@ -39,6 +45,24 @@ jobs:
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           echo "Deploying: $SOLUTION_GROUP -> $APP_NAME"
 
+      - name: Install Power Platform Tools
+        uses: microsoft/powerplatform-actions/actions-install@v1
+
+      - name: Pull only needed LFS files
+        run: git lfs pull --include="SolutionGroups/${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}.zip"
+
+      - name: Import managed solution
+        uses: microsoft/powerplatform-actions/import-solution@v1
+        with:
+          environment-url: ${{ secrets.ENVIRONMENT_URL }}
+          app-id: ${{ secrets.CLIENT_ID }}
+          client-secret: ${{ secrets.CLIENT_SECRET }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          solution-name: ${{ steps.parse.outputs.app_name }}
+          solution-file: '${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}.zip'
+          working-directory: './SolutionGroups/'
+          publish-changes: true
+        
       - name: Deploy Application
         run: |
           echo "Deploying ${{ steps.parse.outputs.app_name }} from solution group ${{ steps.parse.outputs.solution_group }}"
