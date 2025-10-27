@@ -47,11 +47,12 @@ jobs:
         uses: microsoft/powerplatform-actions/export-solution@v1
         with:
           environment-url: ${{ secrets.ENVIRONMENT_URL }}
-          user-name: ${{ secrets.CLIENT_ID }}
-          password-secret: ${{ secrets.CLIENT_SECRET }}
+          app-id: ${{ secrets.CLIENT_ID }}
+          client-secret: ${{ secrets.CLIENT_SECRET }}
+          tenant-id: ${{ secrets.TENANT_ID }}
           solution-name: ${{ steps.parse.outputs.app_name }}
-          solution-output-file: '/${{ steps.parse.outputs.app_name }}.zip'
-          working-directory: 'out'          
+          solution-output-file: '${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}.zip'
+          working-directory: './SolutionGroups/'
 
       # - name: Export Application
       #   run: |
