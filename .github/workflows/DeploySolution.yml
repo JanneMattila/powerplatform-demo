@@ -1,0 +1,126 @@
+name: Deploy Solution
+run-name: Deploy ${{ inputs.solution }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      solution:
+        description: 'Solution to deploy'
+        required: true
+        type: choice
+        options:
+          - 'Library -> LibraryApp'
+          - 'Library -> LibraryTables'
+      trigger_dependent_workflows:
+        description: 'Trigger dependent workflows?'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  deploy-solution:
+    name: Deploy ${{ inputs.solution }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5.0.0
+
+      - name: Parse solution selection
+        id: parse
+        run: |
+          SOLUTION="${{ inputs.solution }}"
+          SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
+          APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
+          echo "solution_group=$SOLUTION_GROUP" >> $GITHUB_OUTPUT
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "Deploying: $SOLUTION_GROUP -> $APP_NAME"
+
+      - name: Deploy Application
+        run: |
+          echo "Deploying ${{ steps.parse.outputs.app_name }} from solution group ${{ steps.parse.outputs.solution_group }}"
+          echo "Deploying from ref: ${{ github.ref }}"
+          echo "Current commit: ${{ github.sha }}"
+          echo ""
+          echo "=========================================="
+          echo "Application Configuration:"
+          echo "=========================================="
+          
+          APP_FILE="./SolutionGroups/${{ steps.parse.outputs.solution_group }}-SolutionGroup/${{ steps.parse.outputs.app_name }}.md"
+          
+          if [ -f "$APP_FILE" ]; then
+            cat "$APP_FILE"
+          else
+            echo "Error: Configuration file not found at: $APP_FILE"
+            exit 1
+          fi
+          
+          echo "=========================================="
+
+      - name: Trigger dependent workflows (optional)
+        if: ${{ success() && inputs.trigger_dependent_workflows }}
+        uses: actions/github-script@v7
+        env:
+          TARGET_REF: ${{ github.ref }}
+          TRIGGER_DEPENDENT_WORKFLOWS: ${{ inputs.trigger_dependent_workflows }}
+          SOLUTION_SELECTION: ${{ inputs.solution }}
+        with:
+          script: |
+            const fs = require('fs');
+            
+            // Parse the solution selection
+            const selection = process.env.SOLUTION_SELECTION;
+            const [solutionGroup, , ...appNameParts] = selection.split(' ');
+            const appName = appNameParts.join(' ');
+            
+            console.log(`Processing dependencies for: ${solutionGroup} -> ${appName}`);
+            
+            // Read the solution groups mapping
+            const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
+            
+            // Get dependent apps for the selected solution
+            if (!solutionGroups[solutionGroup]) {
+              console.log(`Solution group '${solutionGroup}' not found in mapping`);
+              return;
+            }
+            
+            if (!solutionGroups[solutionGroup][appName]) {
+              console.log(`App '${appName}' not found in solution group '${solutionGroup}'`);
+              return;
+            }
+            
+            const dependentApps = solutionGroups[solutionGroup][appName];
+            
+            if (dependentApps.length === 0) {
+              console.log(`No dependent workflows to trigger for ${appName} - this app has no dependencies defined.`);
+              return;
+            }
+            
+            console.log(`Found ${dependentApps.length} dependent app(s): ${dependentApps.join(', ')}`);
+            
+            // Process each dependent app
+            for (const dependentApp of dependentApps) {
+              const dependentSelection = `${solutionGroup} -> ${dependentApp}`;
+              console.log(`Triggering workflow for: ${dependentSelection}`);
+              
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: 'DeploySolution.yml',
+                  ref: process.env.TARGET_REF,
+                  inputs: {
+                    solution: dependentSelection,
+                    trigger_dependent_workflows: String(process.env.TRIGGER_DEPENDENT_WORKFLOWS)
+                  }
+                });
+                
+                console.log(`Successfully triggered: ${dependentSelection}`);
+              } catch (error) {
+                console.error(`Failed to trigger ${dependentSelection}:`, error.message);
+                // Continue with next workflow instead of failing completely
+              }
+            }
