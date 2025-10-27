@@ -56,6 +56,8 @@ This means:
 - When "App A" is deployed/extracted with cascading enabled, it will trigger "App B" and "App C"
 - "App B" and "App C" have no dependencies (empty arrays)
 
+**Note:** The app names in `solution-groups.json` should **not** include number prefixes. The dropdown options in the workflows can include numbers for ordering (e.g., "1. LibraryTables"), but the JSON file uses the base app name without numbers.
+
 ## Workflows
 
 ### 1. Deploy Solution Workflow
@@ -73,15 +75,17 @@ This means:
 **Usage:**
 1. Go to Actions → "Deploy Solution Group"
 2. Click "Run workflow"
-3. Select the solution to deploy (e.g., "ABC -> App A")
+3. Select the solution to deploy (e.g., "ABC -> 1. App A")
 4. Check "Trigger dependent workflows?" to enable cascading
 5. Click "Run workflow"
 
 **Example Flow:**
-- Deploy "ABC -> App A" with cascading enabled
+- Deploy "ABC -> 1. App A" with cascading enabled
   - Deploys App A
   - Automatically triggers deployment of App B
   - Automatically triggers deployment of App C
+
+**Note:** The workflows support numbered app names in the dropdown (e.g., "1. App A", "2. App B") to make ordering clear in the UI. The processing logic automatically removes these number prefixes when matching against `solution-groups.json`.
 
 Here are screenshots of the workflows in action:
 
@@ -130,7 +134,7 @@ Here is the end result after all deployments are done:
 **Usage:**
 1. Go to Actions → "Extract Solution"
 2. Click "Run workflow"
-3. Select the solution to extract (e.g., "DEF -> App D")
+3. Select the solution to extract (e.g., "DEF -> 1. App D")
 4. Check "Trigger dependent workflows?" to enable cascading
 5. Click "Run workflow"
 
@@ -141,6 +145,8 @@ Here is the end result after all deployments are done:
   ```
 - Changes are committed by `github-actions[bot]`
 - If cascading is enabled, dependent apps are also extracted
+
+**Note:** The workflows support numbered app names in the dropdown to make ordering clear in the UI. The processing logic automatically removes these number prefixes.
 
 Here are screenshots of the workflows in action:
 
@@ -250,16 +256,18 @@ on:
         required: true
         type: choice
         options:
-          - 'ABC -> App A'
-          - 'ABC -> App B'
-          - 'ABC -> App C'
-          - 'DEF -> App D'
-          - 'DEF -> App E'
-          - 'DEF -> App F'
-          - 'GHI -> App G'  # Add these new lines
-          - 'GHI -> App H'
-          - 'GHI -> App I'
+          - 'ABC -> 1. App A'
+          - 'ABC -> 2. App B'
+          - 'ABC -> 3. App C'
+          - 'DEF -> 1. App D'
+          - 'DEF -> 2. App E'
+          - 'DEF -> 3. App F'
+          - 'GHI -> 1. App G'  # Add these new lines
+          - 'GHI -> 2. App H'
+          - 'GHI -> 3. App I'
 ```
+
+**Note:** You can add number prefixes (e.g., "1.", "2.") to the dropdown options to indicate ordering in the UI. The workflows automatically strip these prefixes when processing.
 
 ### Step 5: Commit and Push
 
@@ -333,14 +341,16 @@ Update **both** workflow files:
 
 ```yaml
 options:
-  - 'ABC -> App A'
-  - 'ABC -> App B'
-  - 'ABC -> App C'
-  - 'ABC -> App X'  # Add this new line
-  - 'DEF -> App D'
-  - 'DEF -> App E'
-  - 'DEF -> App F'
+  - 'ABC -> 1. App A'
+  - 'ABC -> 2. App B'
+  - 'ABC -> 3. App C'
+  - 'ABC -> 4. App X'  # Add this new line
+  - 'DEF -> 1. App D'
+  - 'DEF -> 2. App E'
+  - 'DEF -> 3. App F'
 ```
+
+**Note:** You can add number prefixes to indicate ordering in the UI. The workflows automatically strip these prefixes when processing.
 
 ### Step 4: Commit and Push
 

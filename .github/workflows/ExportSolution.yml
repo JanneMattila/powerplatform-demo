@@ -9,8 +9,8 @@ on:
         required: true
         type: choice
         options:
-          - 'Library -> LibraryApp'
-          - 'Library -> LibraryTables'
+          - 'Library -> 1. LibraryTables'
+          - 'Library -> 2. LibraryApp'
       trigger_dependent_workflows:
         description: 'Trigger dependent workflows?'
         required: false
@@ -41,6 +41,8 @@ jobs:
           SOLUTION="${{ inputs.solution }}"
           SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
           APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
+          # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
+          APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
           echo "solution_group=$SOLUTION_GROUP" >> $GITHUB_OUTPUT
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           echo "Exporting: $SOLUTION_GROUP -> $APP_NAME"
@@ -137,7 +139,10 @@ jobs:
             // Parse the solution selection
             const selection = process.env.SOLUTION_SELECTION;
             const [solutionGroup, , ...appNameParts] = selection.split(' ');
-            const appName = appNameParts.join(' ');
+            let appName = appNameParts.join(' ');
+            
+            // Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
+            appName = appName.replace(/^\d+\.\s+/, '');
             
             console.log(`Processing dependencies for: ${solutionGroup} -> ${appName}`);
             
