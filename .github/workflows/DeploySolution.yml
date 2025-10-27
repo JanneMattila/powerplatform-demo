@@ -25,7 +25,7 @@ jobs:
   DeploySolution:
     environment: QA
     if: github.ref != 'refs/heads/main'
-    name: Deploy ${{ inputs.solution }}
+    name: QA - Deploy ${{ inputs.solution }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out
@@ -58,31 +58,9 @@ jobs:
           app-id: ${{ secrets.CLIENT_ID }}
           client-secret: ${{ secrets.CLIENT_SECRET }}
           tenant-id: ${{ secrets.TENANT_ID }}
-          solution-name: ${{ steps.parse.outputs.app_name }}
           solution-file: '${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}.zip'
           working-directory: './SolutionGroups/'
           publish-changes: true
-        
-      - name: Deploy Application
-        run: |
-          echo "Deploying ${{ steps.parse.outputs.app_name }} from solution group ${{ steps.parse.outputs.solution_group }}"
-          echo "Deploying from ref: ${{ github.ref }}"
-          echo "Current commit: ${{ github.sha }}"
-          echo ""
-          echo "=========================================="
-          echo "Application Configuration:"
-          echo "=========================================="
-          
-          APP_FILE="./SolutionGroups/${{ steps.parse.outputs.solution_group }}-SolutionGroup/${{ steps.parse.outputs.app_name }}.md"
-          
-          if [ -f "$APP_FILE" ]; then
-            cat "$APP_FILE"
-          else
-            echo "Error: Configuration file not found at: $APP_FILE"
-            exit 1
-          fi
-          
-          echo "=========================================="
 
       - name: Trigger dependent workflows (optional)
         if: ${{ success() && inputs.trigger_dependent_workflows }}
