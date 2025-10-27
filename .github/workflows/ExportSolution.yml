@@ -131,18 +131,15 @@ jobs:
         env:
           TARGET_REF: ${{ github.ref }}
           TRIGGER_DEPENDENT_WORKFLOWS: ${{ inputs.trigger_dependent_workflows }}
-          SOLUTION_SELECTION: ${{ inputs.solution }}
+          SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
+          APP_NAME: ${{ steps.parse.outputs.app_name }}
         with:
           script: |
             const fs = require('fs');
             
-            // Parse the solution selection
-            const selection = process.env.SOLUTION_SELECTION;
-            const [solutionGroup, , ...appNameParts] = selection.split(' ');
-            let appName = appNameParts.join(' ');
-            
-            // Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
-            appName = appName.replace(/^\d+\.\s+/, '');
+            // Use parsed values from the parse step
+            const solutionGroup = process.env.SOLUTION_GROUP;
+            const appName = process.env.APP_NAME;
             
             console.log(`Processing dependencies for: ${solutionGroup} -> ${appName}`);
             

@@ -1,5 +1,5 @@
 name: Deploy Solution
-run-name: Deploy ${{ inputs.solution }}
+run-name: Deploy ${{ inputs.solution || 'Auto-triggered by changes' }}
 
 on:
   workflow_dispatch:
@@ -16,16 +16,20 @@ on:
         required: false
         default: false
         type: boolean
+  pull_request:
+    paths:
+      - 'SolutionGroups/**/*_unmanaged.zip'
 
 permissions:
   contents: read
   actions: write
+  pull-requests: read
 
 jobs:
   QA:
     environment: QA
     if: github.ref != 'refs/heads/main'
-    name: QA - Deploy ${{ inputs.solution }}
+    name: QA - Deploy ${{ inputs.solution || 'Auto-triggered' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out
@@ -38,14 +42,42 @@ jobs:
       - name: Parse solution selection
         id: parse
         run: |
-          SOLUTION="${{ inputs.solution }}"
-          SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
-          APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
-          # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
-          APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
+          if [ -n "${{ inputs.solution }}" ]; then
+            # Manual workflow dispatch - parse from input
+            SOLUTION="${{ inputs.solution }}"
+            SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
+            APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
+            # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
+            APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
+          else
+            # PR trigger - parse from changed files
+            echo "Detecting solution from PR changes..."
+            
+            # Get list of changed files in the PR
+            CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' | grep '_unmanaged.zip$' || true)
+            
+            if [ -z "$CHANGED_FILES" ]; then
+              echo "Error: No *_unmanaged.zip files found in PR changes"
+              exit 1
+            fi
+            
+            # Take the first changed file and parse it
+            FIRST_FILE=$(echo "$CHANGED_FILES" | head -n 1)
+            echo "Processing file: $FIRST_FILE"
+            
+            # Extract solution group and app name from path
+            # Expected format: SolutionGroups/Library/LibraryTables_unmanaged.zip
+            SOLUTION_GROUP=$(echo "$FIRST_FILE" | cut -d'/' -f2)
+            APP_NAME=$(basename "$FIRST_FILE" _unmanaged.zip)
+            
+            echo "Auto-detected from PR: $SOLUTION_GROUP -> $APP_NAME"
+          fi
+          
           echo "solution_group=$SOLUTION_GROUP" >> $GITHUB_OUTPUT
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           echo "Deploying: $SOLUTION_GROUP -> $APP_NAME"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Install Power Platform Tools
         uses: microsoft/powerplatform-actions/actions-install@v1
@@ -70,15 +102,15 @@ jobs:
         env:
           TARGET_REF: ${{ github.ref }}
           TRIGGER_DEPENDENT_WORKFLOWS: ${{ inputs.trigger_dependent_workflows }}
-          SOLUTION_SELECTION: ${{ inputs.solution }}
+          SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
+          APP_NAME: ${{ steps.parse.outputs.app_name }}
         with:
           script: |
             const fs = require('fs');
             
-            // Parse the solution selection
-            const selection = process.env.SOLUTION_SELECTION;
-            const [solutionGroup, , ...appNameParts] = selection.split(' ');
-            const appName = appNameParts.join(' ');
+            // Use parsed values from the parse step
+            const solutionGroup = process.env.SOLUTION_GROUP;
+            const appName = process.env.APP_NAME;
             
             console.log(`Processing dependencies for: ${solutionGroup} -> ${appName}`);
             
@@ -132,7 +164,7 @@ jobs:
   Production:
     environment: Production
     if: github.ref == 'refs/heads/main'
-    name: Production - Deploy ${{ inputs.solution }}
+    name: Production - Deploy ${{ inputs.solution || 'Auto-triggered' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out
@@ -145,14 +177,42 @@ jobs:
       - name: Parse solution selection
         id: parse
         run: |
-          SOLUTION="${{ inputs.solution }}"
-          SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
-          APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
-          # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
-          APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
+          if [ -n "${{ inputs.solution }}" ]; then
+            # Manual workflow dispatch - parse from input
+            SOLUTION="${{ inputs.solution }}"
+            SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
+            APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
+            # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
+            APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
+          else
+            # PR trigger - parse from changed files
+            echo "Detecting solution from PR changes..."
+            
+            # Get list of changed files in the PR
+            CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' | grep '_unmanaged.zip$' || true)
+            
+            if [ -z "$CHANGED_FILES" ]; then
+              echo "Error: No *_unmanaged.zip files found in PR changes"
+              exit 1
+            fi
+            
+            # Take the first changed file and parse it
+            FIRST_FILE=$(echo "$CHANGED_FILES" | head -n 1)
+            echo "Processing file: $FIRST_FILE"
+            
+            # Extract solution group and app name from path
+            # Expected format: SolutionGroups/Library/LibraryTables_unmanaged.zip
+            SOLUTION_GROUP=$(echo "$FIRST_FILE" | cut -d'/' -f2)
+            APP_NAME=$(basename "$FIRST_FILE" _unmanaged.zip)
+            
+            echo "Auto-detected from PR: $SOLUTION_GROUP -> $APP_NAME"
+          fi
+          
           echo "solution_group=$SOLUTION_GROUP" >> $GITHUB_OUTPUT
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           echo "Deploying: $SOLUTION_GROUP -> $APP_NAME"
+        env:
+          GH_TOKEN: ${{ github.token }}
 
       - name: Install Power Platform Tools
         uses: microsoft/powerplatform-actions/actions-install@v1
@@ -177,18 +237,15 @@ jobs:
         env:
           TARGET_REF: ${{ github.ref }}
           TRIGGER_DEPENDENT_WORKFLOWS: ${{ inputs.trigger_dependent_workflows }}
-          SOLUTION_SELECTION: ${{ inputs.solution }}
+          SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
+          APP_NAME: ${{ steps.parse.outputs.app_name }}
         with:
           script: |
             const fs = require('fs');
             
-            // Parse the solution selection
-            const selection = process.env.SOLUTION_SELECTION;
-            const [solutionGroup, , ...appNameParts] = selection.split(' ');
-            let appName = appNameParts.join(' ');
-            
-            // Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
-            appName = appName.replace(/^\d+\.\s+/, '');
+            // Use parsed values from the parse step
+            const solutionGroup = process.env.SOLUTION_GROUP;
+            const appName = process.env.APP_NAME;
             
             console.log(`Processing dependencies for: ${solutionGroup} -> ${appName}`);
             

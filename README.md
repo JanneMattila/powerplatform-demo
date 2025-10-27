@@ -66,18 +66,28 @@ This means:
 
 **Purpose:** Deploy applications and display their configuration
 
+**Triggers:**
+- **Manual (workflow_dispatch):** Select a solution from dropdown and run manually
+- **Automatic (pull_request):** Triggered automatically when `*_unmanaged.zip` files are changed in the `SolutionGroups/` directory
+
 **Features:**
-- Select a solution from dropdown (e.g., "ABC -> App A")
+- Select a solution from dropdown (e.g., "ABC -> 1. App A") for manual deployment
+- Auto-detects solution from PR changes when triggered by pull request
 - Reads and displays the application's `.md` configuration file
 - Optionally triggers dependent application deployments
 - Uses the branch/tag selected in GitHub Actions UI
 
-**Usage:**
+**Manual Usage:**
 1. Go to Actions → "Deploy Solution Group"
 2. Click "Run workflow"
 3. Select the solution to deploy (e.g., "ABC -> 1. App A")
 4. Check "Trigger dependent workflows?" to enable cascading
 5. Click "Run workflow"
+
+**Automatic Usage:**
+- When a pull request modifies any `*_unmanaged.zip` file in the `SolutionGroups/` directory, the workflow automatically triggers
+- The workflow parses the solution group and app name from the file path
+- Example: `SolutionGroups/Library/LibraryTables_unmanaged.zip` → deploys "Library -> LibraryTables"
 
 **Example Flow:**
 - Deploy "ABC -> 1. App A" with cascading enabled
@@ -370,6 +380,22 @@ Dependencies are defined as **one-way relationships** in `solution-groups.json`:
 
 - **Parent App** → **Dependent Apps** (children)
 - When you deploy/extract a parent app with cascading enabled, all dependent apps are processed automatically
+
+### Automatic Deployment via Pull Requests
+
+The Deploy Solution workflow can be automatically triggered when `*_unmanaged.zip` files are modified in a pull request:
+
+1. **Create/Update Solution Files**: When you export solutions and commit the `*_unmanaged.zip` files to a branch
+2. **Create Pull Request**: Open a PR with changes to files matching `SolutionGroups/**/*_unmanaged.zip`
+3. **Automatic Trigger**: The Deploy Solution workflow automatically runs
+4. **Auto-Detection**: The workflow detects the solution group and app name from the changed file path
+   - Example: `SolutionGroups/Library/LibraryTables_unmanaged.zip` → deploys "Library -> LibraryTables"
+5. **Deployment**: The solution is deployed to the appropriate environment (QA for non-main branches, Production for main branch)
+
+**Benefits:**
+- Automated deployment pipeline triggered by code changes
+- Consistent deployment process for both manual and automatic triggers
+- Clear audit trail through pull request history
 
 ### Example Dependency Chain
 
