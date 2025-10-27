@@ -138,6 +138,8 @@ Here is the end result after all deployments are done:
 **Features:**
 - Updates the first line of the application's `.md` file with timestamp and username
 - Commits the change back to the repository
+- Supports custom branch selection for exports
+- Automatically creates the specified branch if it doesn't exist
 - Optionally triggers dependent application extractions
 - Creates an audit trail of extraction activities
 
@@ -145,16 +147,21 @@ Here is the end result after all deployments are done:
 1. Go to Actions → "Extract Solution"
 2. Click "Run workflow"
 3. Select the solution to extract (e.g., "DEF -> 1. App D")
-4. Check "Trigger dependent workflows?" to enable cascading
-5. Click "Run workflow"
+4. Enter a branch name (default: "export-solution")
+   - If the branch exists, it will be used
+   - If the branch doesn't exist, it will be created
+5. Check "Trigger dependent workflows?" to enable cascading
+6. Click "Run workflow"
 
 **What happens:**
+- The workflow checks out or creates the specified branch
+- Exports the solution from the Development environment
 - The first line of the `.md` file is updated:
   ```markdown
   # DEF-SolutionGroup -> App D - Update 2025-10-07 14:30:45 by JanneMattila
   ```
-- Changes are committed by `github-actions[bot]`
-- If cascading is enabled, dependent apps are also extracted
+- Changes are committed to the specified branch by `github-actions[bot]`
+- If cascading is enabled, dependent apps are also extracted to the same branch
 
 **Note:** The workflows support numbered app names in the dropdown to make ordering clear in the UI. The processing logic automatically removes these number prefixes.
 
@@ -193,6 +200,50 @@ It has started extraction of App E (dependent of App D) and then it will extract
 Here is the end result after all extractions are done:
 
 ![App D extraction completed](./images/run-workflow5.png)
+
+## Branch Management for Exports
+
+The Extract Solution workflow supports custom branch names, allowing you to organize exports into separate branches for different purposes:
+
+### Branch Workflow
+
+1. **Specify Branch Name**: When running the Extract Solution workflow, provide a branch name (e.g., "feature/library-updates", "export-solution", "dev-export")
+2. **Automatic Branch Creation**: If the branch doesn't exist, it will be created automatically from the current branch
+3. **Existing Branch Usage**: If the branch exists, it will be checked out and updated
+4. **Cascading Exports**: All dependent app exports use the same branch, keeping related changes together
+5. **Pull Request Ready**: After exports complete, you can create a PR from the export branch to merge changes
+
+### Use Cases
+
+**Feature Development:**
+```
+Branch: feature/library-updates
+- Export Library -> LibraryTables
+- Export Library -> LibraryApp (cascading)
+- Create PR: feature/library-updates → main
+```
+
+**Regular Exports:**
+```
+Branch: export-solution (default)
+- Regular development exports
+- Review changes before merging
+```
+
+**Environment-Specific Exports:**
+```
+Branch: dev-export
+- Development environment exports
+- Isolated from production changes
+```
+
+### Benefits
+
+- **Isolation**: Keep exports separate from other work
+- **Review**: Review all exported changes in a PR before merging
+- **History**: Clear branch history showing what was exported and when
+- **Collaboration**: Multiple team members can export to different branches simultaneously
+- **Safety**: No direct commits to main branch
 
 ## Adding a New Solution Group
 

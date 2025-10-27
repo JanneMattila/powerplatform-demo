@@ -11,6 +11,11 @@ on:
         options:
           - 'Library -> 1. LibraryTables'
           - 'Library -> 2. LibraryApp'
+      branch_name:
+        description: 'Branch name for export (will be created if it does not exist)'
+        required: true
+        type: string
+        default: 'export-solution'
       trigger_dependent_workflows:
         description: 'Trigger dependent workflows?'
         required: false
@@ -31,9 +36,36 @@ jobs:
       - name: Check out
         uses: actions/checkout@v5.0.0
         with:
-          fetch-depth: 1
+          fetch-depth: 0
         env:
           GIT_LFS_SKIP_SMUDGE: 1
+
+      - name: Create or switch to branch
+        run: |
+          BRANCH_NAME="${{ inputs.branch_name }}"
+          
+          # Configure git
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Fetch all branches
+          git fetch origin
+          
+          # Check if branch exists remotely
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch '$BRANCH_NAME' exists remotely, checking it out..."
+            git checkout "$BRANCH_NAME"
+            git pull origin "$BRANCH_NAME"
+          # Check if branch exists locally
+          elif git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+            echo "Branch '$BRANCH_NAME' exists locally, checking it out..."
+            git checkout "$BRANCH_NAME"
+          else
+            echo "Creating new branch '$BRANCH_NAME'..."
+            git checkout -b "$BRANCH_NAME"
+          fi
+          
+          echo "Current branch: $(git branch --show-current)"
 
       - name: Parse solution selection
         id: parse
@@ -78,8 +110,7 @@ jobs:
 
       - name: Commit changes
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          BRANCH_NAME="${{ inputs.branch_name }}"
           
           git add .
             
@@ -98,8 +129,8 @@ jobs:
               echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES to push changes"
               
               # Try to push
-              if git push; then
-                echo "Changes pushed successfully"
+              if git push origin "$BRANCH_NAME"; then
+                echo "Changes pushed successfully to branch '$BRANCH_NAME'"
                 break
               else
                 RETRY_COUNT=$((RETRY_COUNT + 1))
@@ -107,7 +138,7 @@ jobs:
                   echo "Push failed, pulling latest changes and retrying..."
                   
                   # Pull with rebase to get latest changes
-                  if git pull --rebase origin ${{ github.ref_name }}; then
+                  if git pull --rebase origin "$BRANCH_NAME"; then
                     echo "Rebased successfully, waiting $RETRY_DELAY seconds before retry..."
                     sleep $RETRY_DELAY
                     RETRY_DELAY=$((RETRY_DELAY + 5))  # Exponential backoff
@@ -129,7 +160,7 @@ jobs:
         if: ${{ success() && inputs.trigger_dependent_workflows }}
         uses: actions/github-script@v7
         env:
-          TARGET_REF: ${{ github.ref }}
+          TARGET_BRANCH: ${{ inputs.branch_name }}
           TRIGGER_DEPENDENT_WORKFLOWS: ${{ inputs.trigger_dependent_workflows }}
           SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
           APP_NAME: ${{ steps.parse.outputs.app_name }}
@@ -140,8 +171,10 @@ jobs:
             // Use parsed values from the parse step
             const solutionGroup = process.env.SOLUTION_GROUP;
             const appName = process.env.APP_NAME;
+            const targetBranch = process.env.TARGET_BRANCH;
             
             console.log(`Processing dependencies for: ${solutionGroup} -> ${appName}`);
+            console.log(`Target branch: ${targetBranch}`);
             
             // Read the solution groups mapping
             const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
@@ -169,16 +202,17 @@ jobs:
             // Process each dependent app
             for (const dependentApp of dependentApps) {
               const dependentSelection = `${solutionGroup} -> ${dependentApp}`;
-              console.log(`Triggering workflow for: ${dependentSelection}`);
+              console.log(`Triggering workflow for: ${dependentSelection} on branch ${targetBranch}`);
               
               try {
                 await github.rest.actions.createWorkflowDispatch({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
                   workflow_id: 'ExportSolution.yml',
-                  ref: process.env.TARGET_REF,
+                  ref: targetBranch,
                   inputs: {
                     solution: dependentSelection,
+                    branch_name: targetBranch,
                     trigger_dependent_workflows: String(process.env.TRIGGER_DEPENDENT_WORKFLOWS)
                   }
                 });
