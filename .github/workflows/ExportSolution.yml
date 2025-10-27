@@ -39,6 +39,18 @@ jobs:
         env:
           GIT_LFS_SKIP_SMUDGE: 1
 
+      - name: Validate branch name
+        run: |
+          BRANCH_NAME="${{ inputs.branch_name }}"
+          
+          if [ "$BRANCH_NAME" = "main" ] || [ "$BRANCH_NAME" = "master" ]; then
+            echo "Error: Cannot export to main/master branch"
+            echo "Please specify a different branch name for exports"
+            exit 1
+          fi
+          
+          echo "Branch name validation passed: $BRANCH_NAME"
+
       - name: Create or switch to branch
         run: |
           BRANCH_NAME="${{ inputs.branch_name }}"

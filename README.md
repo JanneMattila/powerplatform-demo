@@ -150,6 +150,7 @@ Here is the end result after all deployments are done:
 4. Enter a branch name (default: "export-solution")
    - If the branch exists, it will be used
    - If the branch doesn't exist, it will be created
+   - **Cannot be "main" or "master"** (protected branches)
 5. Check "Trigger dependent workflows?" to enable cascading
 6. Click "Run workflow"
 
@@ -243,7 +244,8 @@ Branch: dev-export
 - **Review**: Review all exported changes in a PR before merging
 - **History**: Clear branch history showing what was exported and when
 - **Collaboration**: Multiple team members can export to different branches simultaneously
-- **Safety**: No direct commits to main branch
+- **Safety**: No direct commits to main branch (enforced by validation)
+- **Protection**: main and master branches are protected from direct exports
 
 ## Adding a New Solution Group
 
