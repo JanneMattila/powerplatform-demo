@@ -58,6 +58,7 @@ jobs:
           solution-name: ${{ steps.parse.outputs.app_name }}
           solution-output-file: '${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}_unmanaged.zip'
           working-directory: './SolutionGroups/'
+          overwrite: true
           managed: false
 
       - name: Export managed solution
@@ -70,6 +71,7 @@ jobs:
           solution-name: ${{ steps.parse.outputs.app_name }}
           solution-output-file: '${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}.zip'
           working-directory: './SolutionGroups/'
+          overwrite: true
           managed: true
 
       - name: Commit changes
