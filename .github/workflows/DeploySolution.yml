@@ -96,8 +96,8 @@ jobs:
             APP_NAME=$(echo "$VALUE" | cut -d'|' -f2)
             INDEX=$(echo "$VALUE" | cut -d'|' -f3)
             
-            # Add to solutions array in order
-            SOLUTIONS=$(echo "$SOLUTIONS" | jq --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" --argjson idx "$INDEX" '. += [{"solution_group": $sg, "app_name": $app, "order": $idx}]')
+            # Add to solutions array in order (use -c for compact output)
+            SOLUTIONS=$(echo "$SOLUTIONS" | jq -c --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" --argjson idx "$INDEX" '. += [{"solution_group": $sg, "app_name": $app, "order": $idx}]')
           done
           
           echo "solutions=$SOLUTIONS" >> $GITHUB_OUTPUT
@@ -267,8 +267,8 @@ jobs:
             APP_NAME=$(echo "$VALUE" | cut -d'|' -f2)
             INDEX=$(echo "$VALUE" | cut -d'|' -f3)
             
-            # Add to solutions array in order
-            SOLUTIONS=$(echo "$SOLUTIONS" | jq --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" --argjson idx "$INDEX" '. += [{"solution_group": $sg, "app_name": $app, "order": $idx}]')
+            # Add to solutions array in order (use -c for compact output)
+            SOLUTIONS=$(echo "$SOLUTIONS" | jq -c --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" --argjson idx "$INDEX" '. += [{"solution_group": $sg, "app_name": $app, "order": $idx}]')
           done
           
           echo "solutions=$SOLUTIONS" >> $GITHUB_OUTPUT
