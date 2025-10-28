@@ -74,10 +74,15 @@ jobs:
           # Export Metadata
           
           **Solution:** ${{ inputs.app_name }}
+
           **Solution Group:** ${{ inputs.solution_group }}
+
           **Exported:** $TIMESTAMP
+
           **Exported by:** ${{ github.actor }}
+
           **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          
           **Branch:** ${{ inputs.branch_name }}
           EOF
           
