@@ -112,53 +112,54 @@ jobs:
             const solutionGroup = process.env.SOLUTION_GROUP;
             const appName = process.env.APP_NAME;
             
-            console.log(`Processing dependencies for: ${solutionGroup} -> ${appName}`);
+            console.log(`Processing serial deployment for: ${solutionGroup} -> ${appName}`);
             
             // Read the solution groups mapping
             const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
             
-            // Get dependent apps for the selected solution
+            // Get apps array for the selected solution group
             if (!solutionGroups[solutionGroup]) {
               console.log(`Solution group '${solutionGroup}' not found in mapping`);
               return;
             }
             
-            if (!solutionGroups[solutionGroup][appName]) {
+            const apps = solutionGroups[solutionGroup];
+            
+            // Find the current app index
+            const currentIndex = apps.indexOf(appName);
+            
+            if (currentIndex === -1) {
               console.log(`App '${appName}' not found in solution group '${solutionGroup}'`);
               return;
             }
             
-            const dependentApps = solutionGroups[solutionGroup][appName];
-            
-            if (dependentApps.length === 0) {
-              console.log(`No dependent workflows to trigger for ${appName} - this app has no dependencies defined.`);
+            // Check if there's a next app to deploy
+            if (currentIndex >= apps.length - 1) {
+              console.log(`No more apps to deploy after ${appName} - this is the last app in the sequence.`);
               return;
             }
             
-            console.log(`Found ${dependentApps.length} dependent app(s): ${dependentApps.join(', ')}`);
+            // Get the next app in sequence
+            const nextApp = apps[currentIndex + 1];
+            const nextSelection = `${solutionGroup} -> ${nextApp}`;
             
-            // Process each dependent app
-            for (const dependentApp of dependentApps) {
-              const dependentSelection = `${solutionGroup} -> ${dependentApp}`;
-              console.log(`Triggering workflow for: ${dependentSelection}`);
+            console.log(`Triggering next app in sequence: ${nextSelection}`);
+            
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'DeploySolution.yml',
+                ref: process.env.TARGET_REF,
+                inputs: {
+                  solution: nextSelection,
+                  trigger_dependent_workflows: String(process.env.TRIGGER_DEPENDENT_WORKFLOWS)
+                }
+              });
               
-              try {
-                await github.rest.actions.createWorkflowDispatch({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  workflow_id: 'DeploySolution.yml',
-                  ref: process.env.TARGET_REF,
-                  inputs: {
-                    solution: dependentSelection,
-                    trigger_dependent_workflows: String(process.env.TRIGGER_DEPENDENT_WORKFLOWS)
-                  }
-                });
-                
-                console.log(`Successfully triggered: ${dependentSelection}`);
-              } catch (error) {
-                console.error(`Failed to trigger ${dependentSelection}:`, error.message);
-                // Continue with next workflow instead of failing completely
-              }
+              console.log(`Successfully triggered: ${nextSelection}`);
+            } catch (error) {
+              console.error(`Failed to trigger ${nextSelection}:`, error.message);
             }
 
   Production:
@@ -247,51 +248,52 @@ jobs:
             const solutionGroup = process.env.SOLUTION_GROUP;
             const appName = process.env.APP_NAME;
             
-            console.log(`Processing dependencies for: ${solutionGroup} -> ${appName}`);
+            console.log(`Processing serial deployment for: ${solutionGroup} -> ${appName}`);
             
             // Read the solution groups mapping
             const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
             
-            // Get dependent apps for the selected solution
+            // Get apps array for the selected solution group
             if (!solutionGroups[solutionGroup]) {
               console.log(`Solution group '${solutionGroup}' not found in mapping`);
               return;
             }
             
-            if (!solutionGroups[solutionGroup][appName]) {
+            const apps = solutionGroups[solutionGroup];
+            
+            // Find the current app index
+            const currentIndex = apps.indexOf(appName);
+            
+            if (currentIndex === -1) {
               console.log(`App '${appName}' not found in solution group '${solutionGroup}'`);
               return;
             }
             
-            const dependentApps = solutionGroups[solutionGroup][appName];
-            
-            if (dependentApps.length === 0) {
-              console.log(`No dependent workflows to trigger for ${appName} - this app has no dependencies defined.`);
+            // Check if there's a next app to deploy
+            if (currentIndex >= apps.length - 1) {
+              console.log(`No more apps to deploy after ${appName} - this is the last app in the sequence.`);
               return;
             }
             
-            console.log(`Found ${dependentApps.length} dependent app(s): ${dependentApps.join(', ')}`);
+            // Get the next app in sequence
+            const nextApp = apps[currentIndex + 1];
+            const nextSelection = `${solutionGroup} -> ${nextApp}`;
             
-            // Process each dependent app
-            for (const dependentApp of dependentApps) {
-              const dependentSelection = `${solutionGroup} -> ${dependentApp}`;
-              console.log(`Triggering workflow for: ${dependentSelection}`);
+            console.log(`Triggering next app in sequence: ${nextSelection}`);
+            
+            try {
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'DeploySolution.yml',
+                ref: process.env.TARGET_REF,
+                inputs: {
+                  solution: nextSelection,
+                  trigger_dependent_workflows: String(process.env.TRIGGER_DEPENDENT_WORKFLOWS)
+                }
+              });
               
-              try {
-                await github.rest.actions.createWorkflowDispatch({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  workflow_id: 'DeploySolution.yml',
-                  ref: process.env.TARGET_REF,
-                  inputs: {
-                    solution: dependentSelection,
-                    trigger_dependent_workflows: String(process.env.TRIGGER_DEPENDENT_WORKFLOWS)
-                  }
-                });
-                
-                console.log(`Successfully triggered: ${dependentSelection}`);
-              } catch (error) {
-                console.error(`Failed to trigger ${dependentSelection}:`, error.message);
-                // Continue with next workflow instead of failing completely
-              }
+              console.log(`Successfully triggered: ${nextSelection}`);
+            } catch (error) {
+              console.error(`Failed to trigger ${nextSelection}:`, error.message);
             }

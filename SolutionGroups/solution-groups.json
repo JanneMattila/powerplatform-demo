@@ -1,8 +1,6 @@
 {
-    "Library": {
-        "LibraryTables": [
-            "LibraryApp"
-        ],
-        "LibraryApp": []
-    }
+    "Library": [
+        "LibraryTables",
+        "LibraryApp"
+    ]
 }

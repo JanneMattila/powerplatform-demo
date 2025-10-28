@@ -29,32 +29,33 @@ SolutionGroups/
 
 ## Configuration File: solution-groups.json
 
-The `solution-groups.json` file defines the dependency relationships between applications within each Solution Group.
+The `solution-groups.json` file defines the deployment order for applications within each Solution Group as an array.
 
 **Structure:**
 ```json
 {
-    "<SolutionGroupName>": {
-        "<App Name>": ["<Dependent App 1>", "<Dependent App 2>"],
-        "<Another App>": []
-    }
+    "<SolutionGroupName>": [
+        "<App Name 1>",
+        "<App Name 2>",
+        "<App Name 3>"
+    ]
 }
 ```
 
 **Example:**
 ```json
 {
-    "ABC": {
-        "App A": ["App B", "App C"],
-        "App B": [],
-        "App C": []
-    }
+    "Library": [
+        "LibraryTables",
+        "LibraryApp"
+    ]
 }
 ```
 
 This means:
-- When "App A" is deployed/extracted with cascading enabled, it will trigger "App B" and "App C"
-- "App B" and "App C" have no dependencies (empty arrays)
+- Apps are deployed/exported in the order they appear in the array
+- When cascading is enabled, apps are processed sequentially (one after another)
+- "LibraryTables" is deployed/exported first, then "LibraryApp"
 
 **Note:** The app names in `solution-groups.json` should **not** include number prefixes. The dropdown options in the workflows can include numbers for ordering (e.g., "1. LibraryTables"), but the JSON file uses the base app name without numbers.
 
@@ -74,14 +75,14 @@ This means:
 - Select a solution from dropdown (e.g., "ABC -> 1. App A") for manual deployment
 - Auto-detects solution from PR changes when triggered by pull request
 - Reads and displays the application's `.md` configuration file
-- Optionally triggers dependent application deployments
+- Optionally triggers sequential deployment of the next application in the group
 - Uses the branch/tag selected in GitHub Actions UI
 
 **Manual Usage:**
 1. Go to Actions → "Deploy Solution Group"
 2. Click "Run workflow"
-3. Select the solution to deploy (e.g., "ABC -> 1. App A")
-4. Check "Trigger dependent workflows?" to enable cascading
+3. Select the solution to deploy (e.g., "Library -> 1. LibraryTables")
+4. Check "Trigger dependent workflows?" to enable sequential deployment
 5. Click "Run workflow"
 
 **Automatic Usage:**
@@ -90,44 +91,26 @@ This means:
 - Example: `SolutionGroups/Library/LibraryTables_unmanaged.zip` → deploys "Library -> LibraryTables"
 
 **Example Flow:**
-- Deploy "ABC -> 1. App A" with cascading enabled
-  - Deploys App A
-  - Automatically triggers deployment of App B
-  - Automatically triggers deployment of App C
+- Deploy "Library -> 1. LibraryTables" with cascading enabled
+  - Deploys LibraryTables
+  - Automatically triggers deployment of LibraryApp (next in sequence)
 
 **Note:** The workflows support numbered app names in the dropdown (e.g., "1. App A", "2. App B") to make ordering clear in the UI. The processing logic automatically removes these number prefixes when matching against `solution-groups.json`.
 
 Here are screenshots of the workflows in action:
 
-Initiate deployment of App A which has the following configuration:
+Initiate deployment of LibraryTables which has the following configuration:
 
 ```json
 {
-  "ABC": {
-    "App A": [
-      "App B", 
-      "App C"
-    ],
-    "App B": [],
-    "App C": []
-  }
+  "Library": [
+    "LibraryTables",
+    "LibraryApp"
+  ]
 }
 ```
 
-![Initiate deployment of App A](./images/deploy-workflow1.png)
-
-App A deployment in progress:
-
-![App A deployment in progress](./images/deploy-workflow2.png)
-
-App A deployment completed:
-
-![App A deployment completed](./images/deploy-workflow3.png)
-
-It has started deployment of App B (dependent of App A) and then it will deploy App C (dependent of App A).
-Here is the end result after all deployments are done:
-
-![Deployments completed](./images/deploy-workflow4.png)
+When "Trigger dependent workflows" is enabled, it will deploy LibraryTables first, then automatically trigger LibraryApp.
 
 ### 2. Extract Solution Workflow
 
@@ -140,18 +123,18 @@ Here is the end result after all deployments are done:
 - Commits the change back to the repository
 - Supports custom branch selection for exports
 - Automatically creates the specified branch if it doesn't exist
-- Optionally triggers dependent application extractions
+- Optionally triggers sequential extraction of the next application in the group
 - Creates an audit trail of extraction activities
 
 **Usage:**
 1. Go to Actions → "Extract Solution"
 2. Click "Run workflow"
-3. Select the solution to extract (e.g., "DEF -> 1. App D")
+3. Select the solution to extract (e.g., "Library -> 1. LibraryTables")
 4. Enter a branch name (default: "export-solution")
    - If the branch exists, it will be used
    - If the branch doesn't exist, it will be created
    - **Cannot be "main" or "master"** (protected branches)
-5. Check "Trigger dependent workflows?" to enable cascading
+5. Check "Trigger dependent workflows?" to enable sequential extraction
 6. Click "Run workflow"
 
 **What happens:**
@@ -159,48 +142,27 @@ Here is the end result after all deployments are done:
 - Exports the solution from the Development environment
 - The first line of the `.md` file is updated:
   ```markdown
-  # DEF-SolutionGroup -> App D - Update 2025-10-07 14:30:45 by JanneMattila
+  # Library-SolutionGroup -> LibraryTables - Update 2025-10-07 14:30:45 by JanneMattila
   ```
 - Changes are committed to the specified branch by `github-actions[bot]`
-- If cascading is enabled, dependent apps are also extracted to the same branch
+- If cascading is enabled, the next app in the sequence is also extracted to the same branch
 
 **Note:** The workflows support numbered app names in the dropdown to make ordering clear in the UI. The processing logic automatically removes these number prefixes.
 
 Here are screenshots of the workflows in action:
 
-Initiate extraction of App D which has the following configuration:
+Initiate extraction of LibraryTables which has the following configuration:
 
 ```json
 {
-  "DEF": {
-    "App D": [
-      "App E"
-    ],
-    "App E": [
-      "App F"
-    ],
-    "App F": []
-  }
+  "Library": [
+    "LibraryTables",
+    "LibraryApp"
+  ]
 }
 ```
 
-![Initiate extraction of App D](./images/run-workflow1.png)
-
-App D extraction in progress:
-
-![App D extraction in progress](./images/run-workflow2.png)
-
-App D extraction completed:
-
-![App D extraction completed](./images/run-workflow3.png)
-
-It has started extraction of App E (dependent of App D) and then it will extract App F (dependent of App E):
-
-![App D extraction completed](./images/run-workflow4.png)
-
-Here is the end result after all extractions are done:
-
-![App D extraction completed](./images/run-workflow5.png)
+When "Trigger dependent workflows" is enabled, it will export LibraryTables first, then automatically trigger LibraryApp.
 
 ## Branch Management for Exports
 
@@ -220,7 +182,7 @@ The Extract Solution workflow supports custom branch names, allowing you to orga
 ```
 Branch: feature/library-updates
 - Export Library -> LibraryTables
-- Export Library -> LibraryApp (cascading)
+- Export Library -> LibraryApp (automatically triggered next in sequence)
 - Create PR: feature/library-updates → main
 ```
 
@@ -282,23 +244,19 @@ Add the new solution group to `SolutionGroups/solution-groups.json`:
 
 ```json
 {
-    "ABC": {
-        "App A": ["App B", "App C"],
-        "App B": [],
-        "App C": []
-    },
-    "DEF": {
-        "App D": ["App E"],
-        "App E": ["App F"],
-        "App F": []
-    },
-    "GHI": {
-        "App G": ["App H"],
-        "App H": ["App I"],
-        "App I": []
-    }
+    "Library": [
+        "LibraryTables",
+        "LibraryApp"
+    ],
+    "GHI": [
+        "App G",
+        "App H",
+        "App I"
+    ]
 }
 ```
+
+**Note:** Apps are listed in deployment order. When cascading is enabled, they will be processed sequentially in this order.
 
 ### Step 4: Update Workflow Files
 
@@ -319,18 +277,14 @@ on:
         required: true
         type: choice
         options:
-          - 'ABC -> 1. App A'
-          - 'ABC -> 2. App B'
-          - 'ABC -> 3. App C'
-          - 'DEF -> 1. App D'
-          - 'DEF -> 2. App E'
-          - 'DEF -> 3. App F'
+          - 'Library -> 1. LibraryTables'
+          - 'Library -> 2. LibraryApp'
           - 'GHI -> 1. App G'  # Add these new lines
           - 'GHI -> 2. App H'
           - 'GHI -> 3. App I'
 ```
 
-**Note:** You can add number prefixes (e.g., "1.", "2.") to the dropdown options to indicate ordering in the UI. The workflows automatically strip these prefixes when processing.
+**Note:** You can add number prefixes (e.g., "1.", "2.") to the dropdown options to indicate ordering in the UI. The workflows automatically strip these prefixes when processing. The numbers also reflect the sequential deployment order.
 
 ### Step 5: Commit and Push
 
@@ -359,38 +313,25 @@ Add the new app to the appropriate solution group in `SolutionGroups/solution-gr
 **Before:**
 ```json
 {
-    "ABC": {
-        "App A": ["App B", "App C"],
-        "App B": [],
-        "App C": []
-    }
+    "Library": [
+        "LibraryTables",
+        "LibraryApp"
+    ]
 }
 ```
 
 **After:**
 ```json
 {
-    "ABC": {
-        "App A": ["App B", "App C"],
-        "App B": [],
-        "App C": [],
-        "App X": []
-    }
+    "Library": [
+        "LibraryTables",
+        "LibraryApp",
+        "App X"
+    ]
 }
 ```
 
-**If you want to add dependencies:**
-```json
-{
-    "ABC": {
-        "App A": ["App B", "App C", "App X"],
-        "App B": [],
-        "App C": [],
-        "App X": []
-    }
-}
-```
-This makes "App X" a dependency of "App A".
+**Note:** The position in the array determines the deployment order. "App X" will be deployed/exported after "LibraryApp" when cascading is enabled.
 
 ### Step 3: Update Workflow Files
 
