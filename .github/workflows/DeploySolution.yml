@@ -27,6 +27,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - '!.github/workflows/**'
+      - '!SolutionGroups/solution-groups.json'
 
 permissions:
   contents: read
@@ -150,6 +153,7 @@ jobs:
               let workflowRun = null;
               let attempts = 0;
               const maxAttempts = 360; // 30 minutes max wait (360 * 5 seconds)
+              let workflowStartLogged = false;
               
               while (attempts < maxAttempts) {
                 // Get recent workflow runs
@@ -166,15 +170,16 @@ jobs:
                   (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
                 );
                 
+                if (recentRun && !workflowStartLogged) {
+                  console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
+                  workflowStartLogged = true;
+                }
+                
                 if (recentRun && recentRun.status === 'completed') {
                   workflowRun = recentRun;
                   console.log(`\nWorkflow ${displayNumber} completed with status: ${recentRun.conclusion}`);
                   console.log(`View workflow run: ${recentRun.html_url}`);
                   break;
-                }
-                
-                if (recentRun && attempts === 0) {
-                  console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
                 }
                 
                 if (attempts % 6 === 0) { // Log every 30 seconds
@@ -326,6 +331,7 @@ jobs:
               let workflowRun = null;
               let attempts = 0;
               const maxAttempts = 180; // 15 minutes max wait (180 * 5 seconds)
+              let workflowStartLogged = false;
               
               while (attempts < maxAttempts) {
                 // Get recent workflow runs
@@ -342,15 +348,16 @@ jobs:
                   (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
                 );
                 
+                if (recentRun && !workflowStartLogged) {
+                  console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
+                  workflowStartLogged = true;
+                }
+                
                 if (recentRun && recentRun.status === 'completed') {
                   workflowRun = recentRun;
                   console.log(`\nWorkflow ${displayNumber} completed with status: ${recentRun.conclusion}`);
                   console.log(`View workflow run: ${recentRun.html_url}`);
                   break;
-                }
-                
-                if (recentRun && attempts === 0) {
-                  console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
                 }
                 
                 if (attempts % 6 === 0) { // Log every 30 seconds
@@ -485,6 +492,7 @@ jobs:
               let workflowRun = null;
               let attempts = 0;
               const maxAttempts = 180; // 15 minutes max wait (180 * 5 seconds)
+              let workflowStartLogged = false;
               
               while (attempts < maxAttempts) {
                 // Get recent workflow runs
@@ -500,15 +508,16 @@ jobs:
                   (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
                 );
                 
+                if (recentRun && !workflowStartLogged) {
+                  console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
+                  workflowStartLogged = true;
+                }
+                
                 if (recentRun && recentRun.status === 'completed') {
                   workflowRun = recentRun;
                   console.log(`\nWorkflow ${displayNumber} completed with status: ${recentRun.conclusion}`);
                   console.log(`View workflow run: ${recentRun.html_url}`);
                   break;
-                }
-                
-                if (recentRun && attempts === 0) {
-                  console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
                 }
                 
                 if (attempts % 6 === 0) { // Log every 30 seconds
