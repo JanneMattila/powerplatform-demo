@@ -1,4 +1,4 @@
-name: Export One Solution
+name: Export One Solution (Worker)
 run-name: 'Export ${{ inputs.solution_group }} -> ${{ inputs.app_name }}'
 
 on:

@@ -1,4 +1,4 @@
-name: Deploy One Solution
+name: Deploy One Solution (Worker)
 run-name: Deploy ${{ inputs.solution_group }} -> ${{ inputs.app_name }} to ${{ inputs.environment }}
 
 on:

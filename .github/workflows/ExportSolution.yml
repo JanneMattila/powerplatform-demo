@@ -1,4 +1,4 @@
-name: Export Solution
+name: Export Solutions (Orchestrator)
 run-name: Export ${{ inputs.solution }}${{ inputs.export_dependencies && ' with dependencies' || '' }}
 
 on:

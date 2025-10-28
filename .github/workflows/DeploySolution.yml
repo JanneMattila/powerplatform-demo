@@ -1,4 +1,4 @@
-name: Deploy Solution
+name: Deploy Solutions (Orchestrator)
 run-name: Deploy ${{ inputs.solution || 'Auto-triggered by PR' }}${{ inputs.deploy_dependencies && ' with dependencies' || '' }}
 
 on:
