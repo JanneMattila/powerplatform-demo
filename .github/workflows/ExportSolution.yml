@@ -300,19 +300,17 @@ jobs:
         uses: actions/github-script@v7
         env:
           BRANCH_NAME: ${{ steps.validate_branch.outputs.branch_name }}
-          SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
-          APP_NAME: ${{ steps.parse.outputs.app_name }}
+          SOLUTION: ${{ inputs.solution }}
           EXPORT_DEPENDENCIES: ${{ inputs.export_dependencies }}
         with:
           script: |
             const branchName = process.env.BRANCH_NAME;
-            const solutionGroup = process.env.SOLUTION_GROUP;
-            const appName = process.env.APP_NAME;
+            const solution = process.env.SOLUTION;
             const exportDependencies = process.env.EXPORT_DEPENDENCIES === 'true';
             
             console.log(`\n========================================`);
             console.log(`Triggering QA deployment orchestrator`);
-            console.log(`Solution: ${solutionGroup} -> ${appName}`);
+            console.log(`Solution: ${solution}`);
             console.log(`Deploy dependencies: ${exportDependencies}`);
             console.log(`========================================`);
             
@@ -324,7 +322,7 @@ jobs:
                 workflow_id: 'DeploySolution.yml',
                 ref: branchName,
                 inputs: {
-                  solution: `${solutionGroup} -> ${appName}`,
+                  solution: solution,
                   environment: 'QA',
                   deploy_dependencies: String(exportDependencies)
                 }
