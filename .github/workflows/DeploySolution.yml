@@ -29,6 +29,7 @@ on:
       - main
     paths:
       - '!.github/workflows/**'
+      - '!SolutionGroups/solution-groups.json'
 
 permissions:
   contents: read
@@ -110,12 +111,15 @@ jobs:
         uses: actions/github-script@v7
         env:
           SOLUTIONS: ${{ steps.detect.outputs.solutions }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
         with:
           script: |
             const solutions = JSON.parse(process.env.SOLUTIONS);
             const totalCount = solutions.length;
+            const headRef = process.env.HEAD_REF;
             
             console.log(`Will deploy ${totalCount} solution(s) to QA`);
+            console.log(`Using branch: ${headRef}`);
             
             // Deploy each solution sequentially
             for (let i = 0; i < solutions.length; i++) {
@@ -128,12 +132,12 @@ jobs:
               console.log(`Environment: QA`);
               console.log(`========================================`);
               
-              // Trigger the workflow
+              // Trigger the workflow on the PR head branch
               await github.rest.actions.createWorkflowDispatch({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 workflow_id: 'DeployOneSolution.yml',
-                ref: context.ref,
+                ref: headRef,
                 inputs: {
                   solution_group: solution.solution_group,
                   app_name: solution.app_name,
@@ -161,7 +165,7 @@ jobs:
                 
                 // Find the most recent run for this branch (should be the one we just triggered)
                 const recentRun = runs.data.workflow_runs.find(run => 
-                  run.head_branch === context.ref.replace('refs/heads/', '') &&
+                  run.head_branch === headRef &&
                   (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
                 );
                 
