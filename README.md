@@ -1,15 +1,15 @@
 # Power Platform Demo - Solution Groups
 
-This repository contains the configuration and metadata for Solution Groups and their associated applications. Solution Groups are used to organize and manage deployments and extractions of related applications with dependency management.
+This repository contains the configuration and metadata for Solution Groups and their associated Power Platform solutions. Solution Groups are used to organize and manage deployments and exports of related solutions with dependency management.
 
 ## Overview
 
 Two GitHub Actions workflows manage the Solution Groups:
 
-1. **Deploy Solution** (`DeploySolution.yml`) - Deploys applications and shows their configuration
-2. **Extract Solution** (`ExportSolution.yml`) - Updates application metadata with timestamps and commits changes
+1. **Deploy Solutions (Orchestrator)** (`DeploySolution.yml`) - Orchestrates sequential deployment of solutions to QA or Production environments
+2. **Export Solutions (Orchestrator)** (`ExportSolution.yml`) - Orchestrates sequential export of solutions from Development environment
 
-Both workflows support **cascading/dependent workflow triggering**, allowing automatic deployment or extraction of dependent applications.
+Both workflows support **dependency/sequential processing**, allowing automatic export or deployment of dependent solutions in the correct order.
 
 ## Directory Structure
 
@@ -17,14 +17,20 @@ Both workflows support **cascading/dependent workflow triggering**, allowing aut
 SolutionGroups/
 ├── solution-groups.json          # Dependency mapping configuration
 ├── README.md                     # This documentation
-├── ABC-SolutionGroup/            # Solution Group "ABC"
-│   ├── App A.md                  # Application A configuration
-│   ├── App B.md                  # Application B configuration
-│   └── App C.md                  # Application C configuration
-└── DEF-SolutionGroup/            # Solution Group "DEF"
-    ├── App D.md                  # Application D configuration
-    ├── App E.md                  # Application E configuration
-    └── App F.md                  # Application F configuration
+├── Library/                      # Solution Group "Library"
+│   ├── LibraryTables.md          # LibraryTables metadata
+│   ├── LibraryTables.zip         # LibraryTables managed solution
+│   ├── LibraryTables_unmanaged.zip # LibraryTables unmanaged solution
+│   ├── LibraryApp.md             # LibraryApp metadata
+│   ├── LibraryApp.zip            # LibraryApp managed solution
+│   └── LibraryApp_unmanaged.zip  # LibraryApp unmanaged solution
+└── MyVacations/                  # Solution Group "MyVacations"
+    ├── MyVacationsTables.md      # MyVacationsTables metadata
+    ├── MyVacationsTables.zip     # MyVacationsTables managed solution
+    ├── MyVacationsTables_unmanaged.zip # MyVacationsTables unmanaged solution
+    ├── MyVacationsApp.md         # MyVacationsApp metadata
+    ├── MyVacationsApp.zip        # MyVacationsApp managed solution
+    └── MyVacationsApp_unmanaged.zip # MyVacationsApp unmanaged solution
 ```
 
 ## Configuration File: solution-groups.json
@@ -35,21 +41,26 @@ The `solution-groups.json` file defines the deployment order for applications wi
 ```json
 {
     "<SolutionGroupName>": [
-        "<App Name 1>",
-        "<App Name 2>",
-        "<App Name 3>"
+        "FirstApp",
+        "SecondApp",
+        "ThirdApp"
     ]
 }
 ```
 
-**Example:**
+**Current Configuration:**
 ```json
 {
     "Library": [
         "LibraryTables",
         "LibraryApp"
+    ],
+    "MyVacations": [
+        "MyVacationsTables",
+        "MyVacationsApp"
     ]
 }
+```
 ```
 
 This means:
@@ -72,30 +83,37 @@ This means:
 - **Automatic (pull_request):** Triggered automatically when `*_unmanaged.zip` files are changed in the `SolutionGroups/` directory
 
 **Features:**
-- Select a solution from dropdown (e.g., "ABC -> 1. App A") for manual deployment
+- Select a solution from dropdown (e.g., "Library -> 1. LibraryTables") for manual deployment
 - Auto-detects solution from PR changes when triggered by pull request
-- Reads and displays the application's `.md` configuration file
-- Optionally triggers sequential deployment of the next application in the group
+- Deploys solutions to the specified environment
+- Optionally deploys dependencies (subsequent solutions in the group)
 - Uses the branch/tag selected in GitHub Actions UI
 
 **Manual Usage:**
-1. Go to Actions → "Deploy Solution Group"
+1. Go to Actions → "Deploy Solutions (Orchestrator)"
 2. Click "Run workflow"
 3. Select the solution to deploy (e.g., "Library -> 1. LibraryTables")
-4. Check "Trigger dependent workflows?" to enable sequential deployment
-5. Click "Run workflow"
+4. Select the target environment (QA or Production)
+5. Check "Deploy dependencies?" to enable sequential deployment of remaining solutions
+6. Click "Run workflow"
 
-**Automatic Usage:**
-- When a pull request modifies any `*_unmanaged.zip` file in the `SolutionGroups/` directory, the workflow automatically triggers
-- The workflow parses the solution group and app name from the file path
-- Example: `SolutionGroups/Library/LibraryTables_unmanaged.zip` → deploys "Library -> LibraryTables"
+**Automatic Usage (QA Deployment):**
+- When a pull request modifies any file in the `SolutionGroups/` directory (except `.github/workflows/**` and `solution-groups.json`), the workflow automatically triggers
+- The workflow detects all `*_unmanaged.zip` files changed in the PR
+- Solutions are deployed in the order defined in `solution-groups.json`
+- Example: PR with changes to `SolutionGroups/Library/LibraryTables_unmanaged.zip` and `SolutionGroups/Library/LibraryApp_unmanaged.zip` → deploys both in correct order
 
-**Example Flow:**
-- Deploy "Library -> 1. LibraryTables" with cascading enabled
-  - Deploys LibraryTables
-  - Automatically triggers deployment of LibraryApp (next in sequence)
+**Automatic Usage (Production Deployment):**
+- When changes are pushed to the `main` branch (typically after merging a PR), the workflow automatically triggers
+- The workflow detects all `*_unmanaged.zip` files changed in the commit
+- Solutions are deployed sequentially to Production in the order defined in `solution-groups.json`
 
-**Note:** The workflows support numbered app names in the dropdown (e.g., "1. App A", "2. App B") to make ordering clear in the UI. The processing logic automatically removes these number prefixes when matching against `solution-groups.json`.
+**Example Flow (Manual with Dependencies):**
+- Deploy "Library -> 1. LibraryTables" to QA with "Deploy dependencies?" enabled
+  - Deploys LibraryTables to QA
+  - Automatically deploys LibraryApp to QA (next in sequence)
+
+**Note:** The workflows support numbered app names in the dropdown (e.g., "1. LibraryTables", "2. LibraryApp") to make ordering clear in the UI. The processing logic automatically removes these number prefixes when matching against `solution-groups.json`.
 
 Here are screenshots of the workflows in action:
 
@@ -142,16 +160,59 @@ When "Trigger dependent workflows" is enabled, it will deploy LibraryTables firs
 - Exports the solution from the Development environment
 - The first line of the `.md` file is updated:
   ```markdown
-  # Library-SolutionGroup -> LibraryTables - Update 2025-10-07 14:30:45 by JanneMattila
-  ```
-- Changes are committed to the specified branch by `github-actions[bot]`
-- If cascading is enabled, the next app in the sequence is also extracted to the same branch
+  **File:** `.github/workflows/ExportSolution.yml`
+
+**Purpose:** Export Power Platform solutions and commit changes to a branch
+
+**Features:**
+- Exports both managed and unmanaged solution files (.zip)
+- Creates metadata `.md` files with export timestamp, actor, and workflow run link
+- Supports custom branch selection for exports
+- Automatically creates the specified branch if it doesn't exist (or generates timestamped branch name)
+- Optionally exports dependencies (subsequent solutions in the group)
+- Automatically creates a pull request after exports complete
+- Triggers QA deployment workflow after PR creation
+- Creates an audit trail of export activities
+
+**Usage:**
+1. Go to Actions → "Export Solutions (Orchestrator)"
+2. Click "Run workflow"
+3. Select the solution to export (e.g., "Library -> 1. LibraryTables")
+4. Enter a branch name (optional)
+   - Leave empty for auto-generated name with timestamp (e.g., "features/export-solution-20250428-143022")
+   - If the branch exists, it will be used
+   - If it doesn't exist, it will be created
+   - **Cannot be "main" or "master"** (protected branches)
+5. Check "Export dependencies?" to enable sequential export of remaining solutions
+6. Click "Run workflow"
+
+**What happens:**
+- The workflow creates or checks out the specified branch
+- For each solution to export:
+  - Exports managed solution (.zip file)
+  - Exports unmanaged solution (_unmanaged.zip file)
+  - Creates metadata file (.md file) with:
+    ```markdown
+    # Export Metadata
+    
+    **Solution:** LibraryTables
+    **Solution Group:** Library
+    **Exported:** 2025-10-28 14:30:22 UTC
+    **Exported by:** username
+    **Workflow Run:** [link to workflow run]
+    **Branch:** features/library-export
+    ```
+  - Commits changes to the branch with retry logic for conflicts
+- If "Export dependencies?" is enabled, subsequent solutions are also exported to the same branch
+- After all exports complete:
+  - Automatically creates a pull request (or updates existing PR)
+  - Triggers the Deploy Solutions workflow to deploy to QA environment
 
 **Note:** The workflows support numbered app names in the dropdown to make ordering clear in the UI. The processing logic automatically removes these number prefixes.
 
-Here are screenshots of the workflows in action:
+**Example Flow:**
 
-Initiate extraction of LibraryTables which has the following configuration:
+Exporting LibraryTables with the following configuration:
 
 ```json
 {
@@ -162,11 +223,11 @@ Initiate extraction of LibraryTables which has the following configuration:
 }
 ```
 
-When "Trigger dependent workflows" is enabled, it will export LibraryTables first, then automatically trigger LibraryApp.
+When "Export dependencies?" is enabled, it will export LibraryTables first, then automatically export LibraryApp to the same branch.
 
 ## Branch Management for Exports
 
-The Extract Solution workflow supports custom branch names, allowing you to organize exports into separate branches for different purposes:
+The Export Solutions workflow supports custom branch names, allowing you to organize exports into separate branches for different purposes:
 
 ### Branch Workflow
 
@@ -180,16 +241,18 @@ The Extract Solution workflow supports custom branch names, allowing you to orga
 
 **Feature Development:**
 ```
-Branch: feature/library-updates
+Branch: features/library-updates
 - Export Library -> LibraryTables
-- Export Library -> LibraryApp (automatically triggered next in sequence)
-- Create PR: feature/library-updates → main
+- Export Library -> LibraryApp (automatically with "Export dependencies?" enabled)
+- Automatically creates PR: features/library-updates → main
+- Automatically triggers QA deployment
 ```
 
-**Regular Exports:**
+**Timestamped Exports:**
 ```
-Branch: export-solution (default)
-- Regular development exports
+Branch: (leave empty for auto-generated name)
+- Auto-generated: features/export-solution-20250428-143022
+- Regular development exports with unique branch names
 - Review changes before merging
 ```
 
@@ -208,37 +271,20 @@ Branch: dev-export
 - **Collaboration**: Multiple team members can export to different branches simultaneously
 - **Safety**: No direct commits to main branch (enforced by validation)
 - **Protection**: main and master branches are protected from direct exports
+- **Auto-timestamping**: Leave branch name empty for automatic timestamp-based branch names
 
 ## Adding a New Solution Group
 
-Follow these steps to add a new Solution Group (e.g., "GHI"):
+Follow these steps to add a new Solution Group (e.g., "Benefits"):
 
 ### Step 1: Create the Directory Structure
 
 ```powershell
 # Create the solution group directory
-mkdir SolutionGroups\GHI-SolutionGroup
+mkdir SolutionGroups\Benefits
 ```
 
-### Step 2: Create Application Files
-
-Create a `.md` file for each application in the solution group:
-
-```powershell
-# Create application markdown files
-"# GHI-SolutionGroup -> App G" | Out-File -FilePath "SolutionGroups\GHI-SolutionGroup\App G.md" -Encoding UTF8
-"# GHI-SolutionGroup -> App H" | Out-File -FilePath "SolutionGroups\GHI-SolutionGroup\App H.md" -Encoding UTF8
-"# GHI-SolutionGroup -> App I" | Out-File -FilePath "SolutionGroups\GHI-SolutionGroup\App I.md" -Encoding UTF8
-```
-
-**File format:**
-```markdown
-# <SolutionGroup>-SolutionGroup -> <AppName>
-
-[Optional: Add application-specific configuration details here]
-```
-
-### Step 3: Update solution-groups.json
+### Step 2: Update solution-groups.json
 
 Add the new solution group to `SolutionGroups/solution-groups.json`:
 
@@ -248,17 +294,20 @@ Add the new solution group to `SolutionGroups/solution-groups.json`:
         "LibraryTables",
         "LibraryApp"
     ],
-    "GHI": [
-        "App G",
-        "App H",
-        "App I"
+    "MyVacations": [
+        "MyVacationsTables",
+        "MyVacationsApp"
+    ],
+    "Benefits": [
+        "BenefitsTables",
+        "BenefitsApp"
     ]
 }
 ```
 
-**Note:** Apps are listed in deployment order. When cascading is enabled, they will be processed sequentially in this order.
+**Note:** Solutions are listed in deployment order. When "Deploy/Export dependencies?" is enabled, they will be processed sequentially in this order. In this example, BenefitsTables must be deployed before BenefitsApp.
 
-### Step 4: Update Workflow Files
+### Step 3: Update Workflow Files
 
 Update **both** workflow files to include the new solution group options:
 
@@ -266,44 +315,161 @@ Update **both** workflow files to include the new solution group options:
 - `.github/workflows/DeploySolution.yml`
 - `.github/workflows/ExportSolution.yml`
 
-**Add these lines to the `options` section:**
+**Add these lines to the `options` section under `inputs.solution`:**
 
 ```yaml
 on:
   workflow_dispatch:
     inputs:
       solution:
-        description: 'Solution to deploy'  # or 'Solution to extract'
+        description: 'Solution to export' # or 'Solution to deploy'
         required: true
         type: choice
         options:
           - 'Library -> 1. LibraryTables'
           - 'Library -> 2. LibraryApp'
-          - 'GHI -> 1. App G'  # Add these new lines
-          - 'GHI -> 2. App H'
-          - 'GHI -> 3. App I'
+          - 'MyVacations -> 1. MyVacationsTables'
+          - 'MyVacations -> 2. MyVacationsApp'
+          - 'Benefits -> 1. BenefitsTables'
+          - 'Benefits -> 2. BenefitsApp'
 ```
 
-**Note:** You can add number prefixes (e.g., "1.", "2.") to the dropdown options to indicate ordering in the UI. The workflows automatically strip these prefixes when processing. The numbers also reflect the sequential deployment order.
+**Note:** Number prefixes (e.g., "1.", "2.") help users understand the dependency order in the UI. The workflows automatically strip these prefixes when processing. The numbers reflect the sequential deployment/export order defined in `solution-groups.json`.
 
-### Step 5: Commit and Push
+### Step 4: Create Solutions in Power Platform
+
+Before running the export workflow, ensure the solutions exist in your Power Platform Development environment:
+
+1. Create "BenefitsTables" solution with tables/data entities
+2. Create "BenefitsApp" solution with apps/flows that depend on BenefitsTables
+
+### Step 5: Run Export Workflow
 
 ```powershell
-git add SolutionGroups/
-git add .github/workflows/
-git commit -m "Add new Solution Group: GHI with Apps G, H, and I"
-git push
+# Go to GitHub Actions → "Export Solutions (Orchestrator)"
+# Select: "Benefits -> 1. BenefitsTables"
+# Branch name: features/benefits-initial-export
+# Check "Export dependencies?" to also export BenefitsApp
+# Click "Run workflow"
 ```
+
+This will:
+- Export BenefitsTables (managed and unmanaged .zip files)
+- Export BenefitsApp (if dependencies enabled)
+- Create metadata .md files with export details
+- Create all files in `SolutionGroups/Benefits/` directory
+- Commit changes to the branch
+- Create a pull request
+- Trigger QA deployment
+
+### Step 6: Verify and Merge
+
+```powershell
+# Review the created PR with exported solution files:
+# - SolutionGroups/Benefits/BenefitsTables.zip
+# - SolutionGroups/Benefits/BenefitsTables_unmanaged.zip
+# - SolutionGroups/Benefits/BenefitsTables.md
+# - SolutionGroups/Benefits/BenefitsApp.zip
+# - SolutionGroups/Benefits/BenefitsApp_unmanaged.zip
+# - SolutionGroups/Benefits/BenefitsApp.md
+
+# Merge the PR to trigger Production deployment
+```
+
+### Benefits of This Approach
+
+✅ **No Manual File Creation** - Solution files (.zip) and metadata (.md) are automatically created by the export workflow
+
+✅ **Consistent Structure** - All solution groups follow the same pattern with managed/unmanaged files and metadata
+
+✅ **Dependency Management** - The order in `solution-groups.json` ensures BenefitsTables is always deployed before BenefitsApp
+
+✅ **Audit Trail** - Metadata files track who exported, when, and from which workflow run
+
+✅ **Automated CI/CD** - Pull requests automatically trigger QA deployment; merging triggers Production deployment
+
+✅ **Git LFS Friendly** - Large .zip files are handled properly with LFS, and the path filters work correctly
+
+✅ **Conflict Resolution** - Export workflow includes retry logic with exponential backoff for concurrent exports
 
 ## Adding a New App to an Existing Solution Group
 
 Follow these steps to add a new application to an existing Solution Group:
 
-### Step 1: Create the Application File
+### Step 1: Update solution-groups.json
+
+Add the new app to the appropriate solution group in `SolutionGroups/solution-groups.json`:
+
+**Before:**
+```json
+{
+    "Library": [
+        "LibraryTables",
+        "LibraryApp"
+    ]
+}
+```
+
+**After:**
+```json
+{
+    "Library": [
+        "LibraryTables",
+        "LibraryApp",
+        "LibraryReports"
+    ]
+}
+```
+
+**Note:** The position in the array determines the deployment order. "LibraryReports" will be deployed/exported after "LibraryApp" when dependencies are enabled.
+
+### Step 2: Update Workflow Files
+
+Update **both** workflow files:
+
+**Files to update:**
+- `.github/workflows/DeploySolution.yml`
+- `.github/workflows/ExportSolution.yml`
+
+**Add the new option to the `inputs.solution.options` section:**
+
+```yaml
+options:
+  - 'Library -> 1. LibraryTables'
+  - 'Library -> 2. LibraryApp'
+  - 'Library -> 3. LibraryReports'
+  - 'MyVacations -> 1. MyVacationsTables'
+  - 'MyVacations -> 2. MyVacationsApp'
+```
+
+**Note:** Number prefixes indicate ordering in the UI. The workflows automatically strip these prefixes when processing.
+
+### Step 3: Create Solution in Power Platform
+
+Ensure the "LibraryReports" solution exists in your Power Platform Development environment before exporting.
+
+### Step 4: Run Export Workflow
 
 ```powershell
-# Example: Add "App X" to the "ABC" solution group
-"# ABC-SolutionGroup -> App X" | Out-File -FilePath "SolutionGroups\ABC-SolutionGroup\App X.md" -Encoding UTF8
+# Go to GitHub Actions → "Export Solutions (Orchestrator)"
+# Select: "Library -> 3. LibraryReports"
+# Branch name: features/add-library-reports
+# Click "Run workflow"
+```
+
+This will automatically create all required files:
+- `SolutionGroups/Library/LibraryReports.zip` (managed solution)
+- `SolutionGroups/Library/LibraryReports_unmanaged.zip` (unmanaged solution)
+- `SolutionGroups/Library/LibraryReports.md` (metadata with export details)
+
+### Step 5: Review and Merge
+
+The export workflow will:
+- Create/update the PR with the new solution files
+- Automatically trigger QA deployment
+- Enable Production deployment on merge
+
+**No manual file creation needed** - the export workflow handles everything!" | Out-File -FilePath "SolutionGroups\ABC-SolutionGroup\App X.md" -Encoding UTF8
 ```
 
 ### Step 2: Update solution-groups.json
@@ -377,87 +543,135 @@ Dependencies are defined as **one-way relationships** in `solution-groups.json`:
 
 ### Automatic Deployment via Pull Requests
 
-The Deploy Solution workflow can be automatically triggered when `*_unmanaged.zip` files are modified in a pull request:
+The Deploy Solutions workflow is automatically triggered when solution files are modified:
 
-1. **Create/Update Solution Files**: When you export solutions and commit the `*_unmanaged.zip` files to a branch
-2. **Create Pull Request**: Open a PR with changes to files matching `SolutionGroups/**/*_unmanaged.zip`
-3. **Automatic Trigger**: The Deploy Solution workflow automatically runs
-4. **Auto-Detection**: The workflow detects the solution group and app name from the changed file path
-   - Example: `SolutionGroups/Library/LibraryTables_unmanaged.zip` → deploys "Library -> LibraryTables"
-5. **Deployment**: The solution is deployed to the appropriate environment (QA for non-main branches, Production for main branch)
+**QA Deployment (Pull Request):**
+1. **Export Solutions**: Run the Export Solutions workflow to export from Development environment
+2. **Automatic PR Creation**: The export workflow automatically creates a pull request
+3. **Automatic QA Trigger**: The export workflow triggers the Deploy Solutions workflow
+4. **Auto-Detection**: The workflow detects all `*_unmanaged.zip` files changed in the PR
+5. **Ordered Deployment**: Solutions are deployed to QA in the order defined in `solution-groups.json`
+
+**Production Deployment (Merge to Main):**
+1. **Merge PR**: Review and merge the pull request to the `main` branch
+2. **Automatic Trigger**: The Deploy Solutions workflow automatically runs on push to main
+3. **Auto-Detection**: The workflow detects all `*_unmanaged.zip` files changed in the commit
+4. **Ordered Deployment**: Solutions are deployed to Production in the order defined in `solution-groups.json`
 
 **Benefits:**
-- Automated deployment pipeline triggered by code changes
-- Consistent deployment process for both manual and automatic triggers
+- Fully automated CI/CD pipeline from export to production
+- Consistent deployment process for both QA and Production
 - Clear audit trail through pull request history
+- Dependency order automatically maintained
 
 ### Example Dependency Chain
 
+**Current Configuration:**
 ```json
 {
-    "DEF": {
-        "App D": ["App E"],
-        "App E": ["App F"],
-        "App F": []
-    }
+    "Library": [
+        "LibraryTables",
+        "LibraryApp"
+    ],
+    "MyVacations": [
+        "MyVacationsTables",
+        "MyVacationsApp"
+    ]
 }
 ```
 
-**Execution order when deploying "App D" with cascading:**
-1. Deploy App D
-2. Trigger App E (dependent of App D)
-3. Trigger App F (dependent of App E)
+**Dependencies:**
+- `LibraryApp` depends on `LibraryTables` (tables must exist before app can be deployed)
+- `MyVacationsApp` depends on `MyVacationsTables` (tables must exist before app can be deployed)
+
+**Deployment Behavior:**
+- Deploying "Library -> 1. LibraryTables" with "Deploy dependencies?" enabled:
+  - Deploys LibraryTables first
+  - Then automatically deploys LibraryApp
+  
+- Deploying "MyVacations -> 2. MyVacationsApp" WITHOUT dependencies:
+  - Only deploys MyVacationsApp
+  - Assumes MyVacationsTables is already deployed
+
+**Export Behavior:**
+- Exporting "Library -> 1. LibraryTables" with "Export dependencies?" enabled:
+  - Exports LibraryTables first (managed + unmanaged + metadata)
+  - Then automatically exports LibraryApp (managed + unmanaged + metadata)
+  - All committed to the same branch
 
 ### Error Handling
 
-Both workflows will **fail** if:
-1. The application's `.md` configuration file is not found
+Workflows will **fail** if:
+1. The solution does not exist in the Power Platform environment
+2. There are permission issues with the Power Platform connection
+3. Git operations fail after retries (concurrent exports creating conflicts)
+4. The branch name is "main" or "master" (protected in export workflow)
 
-Both workflows will **succeed** with informational messages if:
-1. "Trigger dependent workflows" is enabled but the app has no dependencies defined (this is normal for leaf nodes in the dependency tree)
+Workflows will **succeed** if:
+1. All solutions are successfully exported/deployed
+2. Metadata files are created successfully
+3. Dependencies are processed in the correct order
 
-This ensures that configuration issues are caught early while allowing flexibility in workflow triggering.
+This ensures that configuration issues are caught early and provide clear error messages for troubleshooting.
 
 ## Best Practices
 
 1. **Naming Convention:**
-   - Solution Group directories: `<Name>-SolutionGroup/`
-   - Application files: `<App Name>.md`
-   - Keep names consistent with `solution-groups.json`
+   - Solution Group directories: `<Name>/` (e.g., `Library/`, `MyVacations/`)
+   - Solution names in Power Platform should match the names in `solution-groups.json`
+   - Use PascalCase for consistency (e.g., `LibraryTables`, `BenefitsApp`)
 
-2. **File Headers:**
-   - Always start `.md` files with: `# <SolutionGroup>-SolutionGroup -> <AppName>`
-   - Extract workflow will update this header automatically
+2. **File Management:**
+   - All solution files (.zip and .md) are automatically created by the Export workflow
+   - Don't manually create or edit solution files
+   - Metadata files (.md) are auto-generated with export details
 
 3. **Dependencies:**
-   - Define dependencies in `solution-groups.json` even if empty (`[]`)
-   - Test cascading with a single app before enabling for production
-   - Be aware of circular dependencies (not currently prevented)
+   - List solutions in deployment order in `solution-groups.json`
+   - Foundation/table solutions should come before apps/flows that use them
+   - Test with "Deploy/Export dependencies?" disabled first, then enable for full testing
 
-4. **Version Control:**
-   - Always commit all changes together (directory, json, workflows)
-   - Use descriptive commit messages
-   - Test workflows after adding new solution groups/apps
+4. **Branch Strategy:**
+   - Use descriptive branch names for feature exports (e.g., `features/library-v2`)
+   - Leave branch name empty for auto-timestamped branches
+   - Review PR changes before merging to trigger Production deployment
+
+5. **Version Control:**
+   - Let Git LFS handle the .zip files automatically
+   - Always commit workflow and solution-groups.json changes together
+   - Use descriptive commit messages referencing solution names
 
 ## Troubleshooting
 
-### Workflow fails with "Configuration file not found"
-- Verify the file exists at: `SolutionGroups/<SolutionGroup>-SolutionGroup/<AppName>.md`
-- Check for typos in folder names or file names
-- Ensure file name matches exactly with `solution-groups.json` (including spaces)
+### Workflow fails with "Solution not found in Power Platform"
+- Verify the solution exists in the Development environment
+- Check that the solution name in `solution-groups.json` exactly matches the Power Platform solution name
+- Ensure the Power Platform connection credentials are valid
 
-### Workflow fails with "No dependent workflows found"
-- This is actually not an error - it's an informational message
-- Occurs when "Trigger dependent workflows" is checked but the app has no dependencies
-- The workflow will succeed; this is normal for apps like "App C" or "App F" that are leaf nodes
-- You can safely check "Trigger dependent workflows" for any app without worrying about this
+### Workflow fails with "Branch name validation failed"
+- Cannot export directly to "main" or "master" branches
+- Use a feature branch name or leave empty for auto-generated name
+- Check for typos in branch name
 
-### New app doesn't appear in dropdown
-- Ensure you updated **both** workflow files (`.github/workflows/DeploySolution.yml` and `ExportSolution.yml`)
+### New solution doesn't appear in dropdown
+- Ensure you updated **both** workflow files:
+  - `.github/workflows/DeploySolution.yml`
+  - `.github/workflows/ExportSolution.yml`
+- Add the solution option with the correct format: `'SolutionGroup -> 1. SolutionName'`
 - Commit and push the workflow changes
 - Refresh the Actions page in GitHub
 
-### Extract workflow doesn't commit changes
-- Check repository permissions in workflow settings
-- Verify `permissions: contents: write` is set in the workflow file
-- Ensure the `.md` file exists and is properly formatted
+### Export workflow doesn't create PR
+- Check that `pull-requests: write` permission is set in the workflow
+- Verify repository settings allow GitHub Actions to create PRs
+- Look for errors in the "Create Pull Request" step logs
+
+### QA deployment doesn't trigger after export
+- Check the "Trigger QA Deployment" step in the export workflow logs
+- Verify `actions: write` permission is set in ExportSolution.yml
+- Ensure DeploySolution.yml workflow exists and is enabled
+
+### Deployment order is incorrect
+- Verify the order in `solution-groups.json` matches your dependency requirements
+- Solutions are deployed in array order (top to bottom)
+- Foundation solutions (tables) should be listed before apps that depend on them
