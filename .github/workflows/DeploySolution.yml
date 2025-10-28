@@ -30,6 +30,8 @@ on:
     paths-ignore:
       - '!.github/workflows/**'
       - '!SolutionGroups/solution-groups.json'
+      - '!docs/**'
+      - '!README.md'
     branches:
       - main
 
