@@ -61,7 +61,6 @@ The `solution-groups.json` file defines the deployment order for applications wi
     ]
 }
 ```
-```
 
 This means:
 - Apps are deployed/exported in the order they appear in the array
