@@ -8,7 +8,7 @@
 
 ## Prerequisites
 
-Power Platform environment(s):
+Power Platform [environment(s)](https://admin.powerplatform.microsoft.com/manage/environments):
 
 ![Power Platform environment(s)](./images/environments.png)
 
