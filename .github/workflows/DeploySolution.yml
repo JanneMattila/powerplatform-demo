@@ -1,5 +1,5 @@
 name: Deploy Solutions (Orchestrator)
-run-name: Deploy ${{ inputs.solution || 'Auto-triggered by PR' }}${{ inputs.deploy_dependencies && ' with dependencies' || '' }}
+run-name: Deploy ${{ inputs.solution || 'Auto-triggered by PR' }}${{ inputs.deploy_dependencies && ' with dependencies ' || ' ' }}${{ inputs.environment || '' }}
 
 on:
   workflow_dispatch:
@@ -25,11 +25,11 @@ on:
         type: boolean
   pull_request:
   push:
-    branches:
-      - main
-    paths:
+    paths-ignore:
       - '!.github/workflows/**'
       - '!SolutionGroups/solution-groups.json'
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -393,7 +393,7 @@ jobs:
   OrchestrateManualDeploy:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    name: Orchestrate Manual Deployment
+    name: Orchestrate ${{ inputs.environment || '' }} Deployment
     steps:
       - name: Check out
         uses: actions/checkout@v5.0.0
