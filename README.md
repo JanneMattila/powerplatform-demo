@@ -13,25 +13,22 @@ Both workflows support **dependency/sequential processing**, allowing automatic 
 
 ## Directory Structure
 
+Here are the most important files and directories from our example repository:
+
 ```
 SolutionGroups/
 ├── solution-groups.json          # Dependency mapping configuration
-├── README.md                     # This documentation
 ├── Library/                      # Solution Group "Library"
-│   ├── LibraryTables.md          # LibraryTables metadata
 │   ├── LibraryTables.zip         # LibraryTables managed solution
-│   ├── LibraryTables_unmanaged.zip # LibraryTables unmanaged solution
-│   ├── LibraryApp.md             # LibraryApp metadata
 │   ├── LibraryApp.zip            # LibraryApp managed solution
-│   └── LibraryApp_unmanaged.zip  # LibraryApp unmanaged solution
+│   └── ...
 └── MyVacations/                  # Solution Group "MyVacations"
-    ├── MyVacationsTables.md      # MyVacationsTables metadata
     ├── MyVacationsTables.zip     # MyVacationsTables managed solution
-    ├── MyVacationsTables_unmanaged.zip # MyVacationsTables unmanaged solution
-    ├── MyVacationsApp.md         # MyVacationsApp metadata
     ├── MyVacationsApp.zip        # MyVacationsApp managed solution
-    └── MyVacationsApp_unmanaged.zip # MyVacationsApp unmanaged solution
+    └── ...
 ```
+
+Folder structure has both managed (.zip) and unmanaged (_unmanaged.zip) solution files, along with metadata (.md) files for each application.
 
 ## Configuration File: solution-groups.json
 
@@ -48,7 +45,7 @@ The `solution-groups.json` file defines the deployment order for applications wi
 }
 ```
 
-**Current Configuration:**
+**Example Configuration:**
 ```json
 {
     "Library": [
