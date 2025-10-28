@@ -1,5 +1,5 @@
 name: Deploy Solution
-run-name: Deploy ${{ inputs.solution || 'Auto-triggered by changes' }}
+run-name: Deploy ${{ inputs.solution || 'Auto-triggered by PR' }}${{ inputs.deploy_dependencies && ' with dependencies' || '' }}
 
 on:
   workflow_dispatch:
@@ -11,12 +11,24 @@ on:
         options:
           - 'Library -> 1. LibraryTables'
           - 'Library -> 2. LibraryApp'
-      trigger_dependent_workflows:
-        description: 'Trigger dependent workflows?'
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - 'QA'
+          - 'Production'
+      deploy_dependencies:
+        description: 'Deploy dependencies?'
         required: false
         default: false
         type: boolean
   pull_request:
+    paths:
+      - 'SolutionGroups/**/*_unmanaged.zip'
+  push:
+    branches:
+      - main
     paths:
       - 'SolutionGroups/**/*_unmanaged.zip'
 
@@ -26,11 +38,11 @@ permissions:
   pull-requests: read
 
 jobs:
-  QA:
+  OrchestrateQADeploy:
+    if: github.event_name == 'pull_request'
     environment: QA
-    if: github.ref != 'refs/heads/main'
-    name: QA - Deploy ${{ inputs.solution || 'Auto-triggered' }}
     runs-on: ubuntu-latest
+    name: Orchestrate QA Deployment
     steps:
       - name: Check out
         uses: actions/checkout@v5.0.0
@@ -39,134 +51,343 @@ jobs:
         env:
           GIT_LFS_SKIP_SMUDGE: 1
 
-      - name: Parse solution selection
-        id: parse
+      - name: Detect solutions from PR
+        id: detect
         run: |
-          if [ -n "${{ inputs.solution }}" ]; then
-            # Manual workflow dispatch - parse from input
-            SOLUTION="${{ inputs.solution }}"
-            SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
-            APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
-            # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
-            APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
-          else
-            # PR trigger - parse from changed files
-            echo "Detecting solution from PR changes..."
-            
-            # Get list of changed files in the PR
-            CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' | grep '_unmanaged.zip$' || true)
-            
-            if [ -z "$CHANGED_FILES" ]; then
-              echo "Error: No *_unmanaged.zip files found in PR changes"
-              exit 1
-            fi
-            
-            # Take the first changed file and parse it
-            FIRST_FILE=$(echo "$CHANGED_FILES" | head -n 1)
-            echo "Processing file: $FIRST_FILE"
-            
-            # Extract solution group and app name from path
-            # Expected format: SolutionGroups/Library/LibraryTables_unmanaged.zip
-            SOLUTION_GROUP=$(echo "$FIRST_FILE" | cut -d'/' -f2)
-            APP_NAME=$(basename "$FIRST_FILE" _unmanaged.zip)
-            
-            echo "Auto-detected from PR: $SOLUTION_GROUP -> $APP_NAME"
+          echo "Detecting solutions from PR changes..."
+          
+          # Get list of changed *_unmanaged.zip files in the PR
+          CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' | grep '_unmanaged.zip$' || true)
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "Error: No *_unmanaged.zip files found in PR changes"
+            exit 1
           fi
           
-          echo "solution_group=$SOLUTION_GROUP" >> $GITHUB_OUTPUT
-          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
-          echo "Deploying: $SOLUTION_GROUP -> $APP_NAME"
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Read solution-groups.json to get proper ordering
+          SOLUTION_GROUPS=$(cat SolutionGroups/solution-groups.json)
+          
+          # Process each file and create a map with ordering info
+          declare -A SOLUTION_MAP
+          while IFS= read -r file; do
+            # Extract solution group and app name from path
+            # Expected format: SolutionGroups/Library/LibraryTables_unmanaged.zip
+            SOLUTION_GROUP=$(echo "$file" | cut -d'/' -f2)
+            APP_NAME=$(basename "$file" _unmanaged.zip)
+            
+            # Find the index of this app in the solution group array
+            INDEX=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" '.[$sg] | to_entries[] | select(.value == $app) | .key')
+            
+            if [ -n "$INDEX" ]; then
+              # Store with key "group_index_appname" for sorting
+              KEY="${SOLUTION_GROUP}_${INDEX}_${APP_NAME}"
+              SOLUTION_MAP[$KEY]="${SOLUTION_GROUP}|${APP_NAME}|${INDEX}"
+            else
+              echo "Warning: App '$APP_NAME' not found in solution group '$SOLUTION_GROUP' in solution-groups.json"
+            fi
+          done <<< "$CHANGED_FILES"
+          
+          # Sort by solution group and index, then build JSON array in correct order
+          SOLUTIONS="[]"
+          for KEY in $(printf '%s\n' "${!SOLUTION_MAP[@]}" | sort); do
+            VALUE="${SOLUTION_MAP[$KEY]}"
+            SOLUTION_GROUP=$(echo "$VALUE" | cut -d'|' -f1)
+            APP_NAME=$(echo "$VALUE" | cut -d'|' -f2)
+            INDEX=$(echo "$VALUE" | cut -d'|' -f3)
+            
+            # Add to solutions array in order
+            SOLUTIONS=$(echo "$SOLUTIONS" | jq --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" --argjson idx "$INDEX" '. += [{"solution_group": $sg, "app_name": $app, "order": $idx}]')
+          done
+          
+          echo "solutions=$SOLUTIONS" >> $GITHUB_OUTPUT
+          echo "Detected solutions in deployment order:"
+          echo "$SOLUTIONS" | jq .
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Install Power Platform Tools
-        uses: microsoft/powerplatform-actions/actions-install@v1
-
-      - name: Pull only needed LFS files
-        run: git lfs pull --include="SolutionGroups/${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}.zip"
-
-      - name: Import managed solution
-        uses: microsoft/powerplatform-actions/import-solution@v1
-        with:
-          environment-url: ${{ secrets.ENVIRONMENT_URL }}
-          app-id: ${{ secrets.CLIENT_ID }}
-          client-secret: ${{ secrets.CLIENT_SECRET }}
-          tenant-id: ${{ secrets.TENANT_ID }}
-          solution-file: '${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}.zip'
-          working-directory: './SolutionGroups/'
-          publish-changes: true
-
-      - name: Trigger dependent workflows (optional)
-        if: ${{ success() && inputs.trigger_dependent_workflows }}
+      - name: Orchestrate sequential deployments to QA
         uses: actions/github-script@v7
         env:
-          TARGET_REF: ${{ github.ref }}
-          TRIGGER_DEPENDENT_WORKFLOWS: ${{ inputs.trigger_dependent_workflows }}
-          SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
-          APP_NAME: ${{ steps.parse.outputs.app_name }}
+          SOLUTIONS: ${{ steps.detect.outputs.solutions }}
         with:
           script: |
-            const fs = require('fs');
+            const solutions = JSON.parse(process.env.SOLUTIONS);
+            const totalCount = solutions.length;
             
-            // Use parsed values from the parse step
-            const solutionGroup = process.env.SOLUTION_GROUP;
-            const appName = process.env.APP_NAME;
+            console.log(`Will deploy ${totalCount} solution(s) to QA`);
             
-            console.log(`Processing serial deployment for: ${solutionGroup} -> ${appName}`);
-            
-            // Read the solution groups mapping
-            const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
-            
-            // Get apps array for the selected solution group
-            if (!solutionGroups[solutionGroup]) {
-              console.log(`Solution group '${solutionGroup}' not found in mapping`);
-              return;
-            }
-            
-            const apps = solutionGroups[solutionGroup];
-            
-            // Find the current app index
-            const currentIndex = apps.indexOf(appName);
-            
-            if (currentIndex === -1) {
-              console.log(`App '${appName}' not found in solution group '${solutionGroup}'`);
-              return;
-            }
-            
-            // Check if there's a next app to deploy
-            if (currentIndex >= apps.length - 1) {
-              console.log(`No more apps to deploy after ${appName} - this is the last app in the sequence.`);
-              return;
-            }
-            
-            // Get the next app in sequence
-            const nextApp = apps[currentIndex + 1];
-            const nextSelection = `${solutionGroup} -> ${nextApp}`;
-            
-            console.log(`Triggering next app in sequence: ${nextSelection}`);
-            
-            try {
+            // Deploy each solution sequentially
+            for (let i = 0; i < solutions.length; i++) {
+              const solution = solutions[i];
+              const displayNumber = i + 1;
+              
+              console.log(`\n========================================`);
+              console.log(`Triggering deployment ${displayNumber} of ${totalCount}`);
+              console.log(`Solution: ${solution.solution_group} -> ${solution.app_name}`);
+              console.log(`Environment: QA`);
+              console.log(`========================================`);
+              
+              // Trigger the workflow
               await github.rest.actions.createWorkflowDispatch({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                workflow_id: 'DeploySolution.yml',
-                ref: process.env.TARGET_REF,
+                workflow_id: 'DeployOneSolution.yml',
+                ref: context.ref,
                 inputs: {
-                  solution: nextSelection,
-                  trigger_dependent_workflows: String(process.env.TRIGGER_DEPENDENT_WORKFLOWS)
+                  solution_group: solution.solution_group,
+                  app_name: solution.app_name,
+                  environment: 'QA'
                 }
               });
               
-              console.log(`Successfully triggered: ${nextSelection}`);
-            } catch (error) {
-              console.error(`Failed to trigger ${nextSelection}:`, error.message);
+              // Wait a moment for the workflow to be created
+              console.log(`Waiting for workflow to be created...`);
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              
+              // Poll for workflow completion
+              let workflowRun = null;
+              let attempts = 0;
+              const maxAttempts = 360; // 30 minutes max wait (360 * 5 seconds)
+              
+              while (attempts < maxAttempts) {
+                // Get recent workflow runs
+                const runs = await github.rest.actions.listWorkflowRuns({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: 'DeployOneSolution.yml',
+                  per_page: 10
+                });
+                
+                // Find the most recent run for this branch (should be the one we just triggered)
+                const recentRun = runs.data.workflow_runs.find(run => 
+                  run.head_branch === context.ref.replace('refs/heads/', '') &&
+                  (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
+                );
+                
+                if (recentRun && recentRun.status === 'completed') {
+                  workflowRun = recentRun;
+                  console.log(`\nWorkflow ${displayNumber} completed with status: ${recentRun.conclusion}`);
+                  console.log(`View workflow run: ${recentRun.html_url}`);
+                  break;
+                }
+                
+                if (recentRun && attempts === 0) {
+                  console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
+                }
+                
+                if (attempts % 6 === 0) { // Log every 30 seconds
+                  console.log(`Waiting for workflow ${displayNumber} to complete... (${Math.floor(attempts * 5 / 60)}m ${(attempts * 5) % 60}s elapsed)`);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                attempts++;
+              }
+              
+              // Check if workflow succeeded
+              if (!workflowRun) {
+                core.setFailed(`Workflow ${displayNumber} (${solution.app_name}) did not complete within the timeout period (15 minutes)`);
+                throw new Error(`Workflow ${displayNumber} timed out`);
+              }
+              
+              if (workflowRun.conclusion !== 'success') {
+                core.setFailed(`Workflow ${displayNumber} (${solution.app_name}) failed with conclusion: ${workflowRun.conclusion}. View run: ${workflowRun.html_url}`);
+                throw new Error(`Workflow ${displayNumber} failed, stopping execution`);
+              }
+              
+              console.log(`✓ Workflow ${displayNumber} (${solution.app_name}) succeeded`);
+              
+              if (i < solutions.length - 1) {
+                console.log(`Proceeding to next deployment...`);
+              }
             }
+            
+            console.log(`\n========================================`);
+            console.log(`✓ All ${totalCount} deployment(s) to QA completed successfully!`);
+            console.log(`========================================`);
 
-  Production:
+  OrchestrateProductionDeploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: Production
-    if: github.ref == 'refs/heads/main'
-    name: Production - Deploy ${{ inputs.solution || 'Auto-triggered' }}
     runs-on: ubuntu-latest
+    name: Orchestrate Production Deployment
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5.0.0
+        with:
+          fetch-depth: 2
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1
+
+      - name: Detect solutions from commit
+        id: detect
+        run: |
+          echo "Detecting solutions from commit changes..."
+          
+          # Get list of changed *_unmanaged.zip files in the last commit
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep '_unmanaged.zip$' || true)
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No *_unmanaged.zip files found in commit changes"
+            echo "solutions=[]" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Read solution-groups.json to get proper ordering
+          SOLUTION_GROUPS=$(cat SolutionGroups/solution-groups.json)
+          
+          # Process each file and create a map with ordering info
+          declare -A SOLUTION_MAP
+          while IFS= read -r file; do
+            # Extract solution group and app name from path
+            # Expected format: SolutionGroups/Library/LibraryTables_unmanaged.zip
+            SOLUTION_GROUP=$(echo "$file" | cut -d'/' -f2)
+            APP_NAME=$(basename "$file" _unmanaged.zip)
+            
+            # Find the index of this app in the solution group array
+            INDEX=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" '.[$sg] | to_entries[] | select(.value == $app) | .key')
+            
+            if [ -n "$INDEX" ]; then
+              # Store with key "group_index_appname" for sorting
+              KEY="${SOLUTION_GROUP}_${INDEX}_${APP_NAME}"
+              SOLUTION_MAP[$KEY]="${SOLUTION_GROUP}|${APP_NAME}|${INDEX}"
+            else
+              echo "Warning: App '$APP_NAME' not found in solution group '$SOLUTION_GROUP' in solution-groups.json"
+            fi
+          done <<< "$CHANGED_FILES"
+          
+          # Sort by solution group and index, then build JSON array in correct order
+          SOLUTIONS="[]"
+          for KEY in $(printf '%s\n' "${!SOLUTION_MAP[@]}" | sort); do
+            VALUE="${SOLUTION_MAP[$KEY]}"
+            SOLUTION_GROUP=$(echo "$VALUE" | cut -d'|' -f1)
+            APP_NAME=$(echo "$VALUE" | cut -d'|' -f2)
+            INDEX=$(echo "$VALUE" | cut -d'|' -f3)
+            
+            # Add to solutions array in order
+            SOLUTIONS=$(echo "$SOLUTIONS" | jq --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" --argjson idx "$INDEX" '. += [{"solution_group": $sg, "app_name": $app, "order": $idx}]')
+          done
+          
+          echo "solutions=$SOLUTIONS" >> $GITHUB_OUTPUT
+          echo "Detected solutions in deployment order:"
+          echo "$SOLUTIONS" | jq .
+
+      - name: Orchestrate sequential deployments to Production
+        if: steps.detect.outputs.solutions != '[]'
+        uses: actions/github-script@v7
+        env:
+          SOLUTIONS: ${{ steps.detect.outputs.solutions }}
+        with:
+          script: |
+            const solutions = JSON.parse(process.env.SOLUTIONS);
+            
+            if (solutions.length === 0) {
+              console.log('No solutions to deploy');
+              return;
+            }
+            
+            const totalCount = solutions.length;
+            
+            console.log(`Will deploy ${totalCount} solution(s) to Production`);
+            
+            // Deploy each solution sequentially
+            for (let i = 0; i < solutions.length; i++) {
+              const solution = solutions[i];
+              const displayNumber = i + 1;
+              
+              console.log(`\n========================================`);
+              console.log(`Triggering deployment ${displayNumber} of ${totalCount}`);
+              console.log(`Solution: ${solution.solution_group} -> ${solution.app_name}`);
+              console.log(`Environment: Production`);
+              console.log(`========================================`);
+              
+              // Trigger the workflow
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'DeployOneSolution.yml',
+                ref: 'main',
+                inputs: {
+                  solution_group: solution.solution_group,
+                  app_name: solution.app_name,
+                  environment: 'Production'
+                }
+              });
+              
+              // Wait a moment for the workflow to be created
+              console.log(`Waiting for workflow to be created...`);
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              
+              // Poll for workflow completion
+              let workflowRun = null;
+              let attempts = 0;
+              const maxAttempts = 180; // 15 minutes max wait (180 * 5 seconds)
+              
+              while (attempts < maxAttempts) {
+                // Get recent workflow runs
+                const runs = await github.rest.actions.listWorkflowRuns({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: 'DeployOneSolution.yml',
+                  per_page: 10
+                });
+                
+                // Find the most recent run for main branch (should be the one we just triggered)
+                const recentRun = runs.data.workflow_runs.find(run => 
+                  run.head_branch === 'main' &&
+                  (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
+                );
+                
+                if (recentRun && recentRun.status === 'completed') {
+                  workflowRun = recentRun;
+                  console.log(`\nWorkflow ${displayNumber} completed with status: ${recentRun.conclusion}`);
+                  console.log(`View workflow run: ${recentRun.html_url}`);
+                  break;
+                }
+                
+                if (recentRun && attempts === 0) {
+                  console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
+                }
+                
+                if (attempts % 6 === 0) { // Log every 30 seconds
+                  console.log(`Waiting for workflow ${displayNumber} to complete... (${Math.floor(attempts * 5 / 60)}m ${(attempts * 5) % 60}s elapsed)`);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                attempts++;
+              }
+              
+              // Check if workflow succeeded
+              if (!workflowRun) {
+                core.setFailed(`Workflow ${displayNumber} (${solution.app_name}) did not complete within the timeout period (15 minutes)`);
+                throw new Error(`Workflow ${displayNumber} timed out`);
+              }
+              
+              if (workflowRun.conclusion !== 'success') {
+                core.setFailed(`Workflow ${displayNumber} (${solution.app_name}) failed with conclusion: ${workflowRun.conclusion}. View run: ${workflowRun.html_url}`);
+                throw new Error(`Workflow ${displayNumber} failed, stopping execution`);
+              }
+              
+              console.log(`✓ Workflow ${displayNumber} (${solution.app_name}) succeeded`);
+              
+              if (i < solutions.length - 1) {
+                console.log(`Proceeding to next deployment...`);
+              }
+            }
+            
+            console.log(`\n========================================`);
+            console.log(`✓ All ${totalCount} deployment(s) to Production completed successfully!`);
+            console.log(`========================================`);
+
+  OrchestrateManualDeploy:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    name: Orchestrate Manual Deployment
     steps:
       - name: Check out
         uses: actions/checkout@v5.0.0
@@ -178,66 +399,20 @@ jobs:
       - name: Parse solution selection
         id: parse
         run: |
-          if [ -n "${{ inputs.solution }}" ]; then
-            # Manual workflow dispatch - parse from input
-            SOLUTION="${{ inputs.solution }}"
-            SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
-            APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
-            # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
-            APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
-          else
-            # PR trigger - parse from changed files
-            echo "Detecting solution from PR changes..."
-            
-            # Get list of changed files in the PR
-            CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' | grep '_unmanaged.zip$' || true)
-            
-            if [ -z "$CHANGED_FILES" ]; then
-              echo "Error: No *_unmanaged.zip files found in PR changes"
-              exit 1
-            fi
-            
-            # Take the first changed file and parse it
-            FIRST_FILE=$(echo "$CHANGED_FILES" | head -n 1)
-            echo "Processing file: $FIRST_FILE"
-            
-            # Extract solution group and app name from path
-            # Expected format: SolutionGroups/Library/LibraryTables_unmanaged.zip
-            SOLUTION_GROUP=$(echo "$FIRST_FILE" | cut -d'/' -f2)
-            APP_NAME=$(basename "$FIRST_FILE" _unmanaged.zip)
-            
-            echo "Auto-detected from PR: $SOLUTION_GROUP -> $APP_NAME"
-          fi
-          
+          SOLUTION="${{ inputs.solution }}"
+          SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
+          APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
+          # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
+          APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
           echo "solution_group=$SOLUTION_GROUP" >> $GITHUB_OUTPUT
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
-          echo "Deploying: $SOLUTION_GROUP -> $APP_NAME"
-        env:
-          GH_TOKEN: ${{ github.token }}
+          echo "Deploying: $SOLUTION_GROUP -> $APP_NAME to ${{ inputs.environment }}"
 
-      - name: Install Power Platform Tools
-        uses: microsoft/powerplatform-actions/actions-install@v1
-
-      - name: Pull only needed LFS files
-        run: git lfs pull --include="SolutionGroups/${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}.zip"
-
-      - name: Import managed solution
-        uses: microsoft/powerplatform-actions/import-solution@v1
-        with:
-          environment-url: ${{ secrets.ENVIRONMENT_URL }}
-          app-id: ${{ secrets.CLIENT_ID }}
-          client-secret: ${{ secrets.CLIENT_SECRET }}
-          tenant-id: ${{ secrets.TENANT_ID }}
-          solution-file: '${{ steps.parse.outputs.solution_group }}/${{ steps.parse.outputs.app_name }}.zip'
-          working-directory: './SolutionGroups/'
-          publish-changes: true
-
-      - name: Trigger dependent workflows (optional)
-        if: ${{ success() && inputs.trigger_dependent_workflows }}
+      - name: Orchestrate sequential deployments
         uses: actions/github-script@v7
         env:
-          TARGET_REF: ${{ github.ref }}
-          TRIGGER_DEPENDENT_WORKFLOWS: ${{ inputs.trigger_dependent_workflows }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          DEPLOY_DEPENDENCIES: ${{ inputs.deploy_dependencies }}
           SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
           APP_NAME: ${{ steps.parse.outputs.app_name }}
         with:
@@ -246,54 +421,123 @@ jobs:
             
             // Use parsed values from the parse step
             const solutionGroup = process.env.SOLUTION_GROUP;
-            const appName = process.env.APP_NAME;
+            const startAppName = process.env.APP_NAME;
+            const environment = process.env.ENVIRONMENT;
+            const deployDependent = process.env.DEPLOY_DEPENDENCIES === 'true';
             
-            console.log(`Processing serial deployment for: ${solutionGroup} -> ${appName}`);
+            console.log(`Starting sequential deployment for: ${solutionGroup} -> ${startAppName}`);
+            console.log(`Target environment: ${environment}`);
+            console.log(`Deploy dependencies: ${deployDependent}`);
             
             // Read the solution groups mapping
             const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
             
             // Get apps array for the selected solution group
             if (!solutionGroups[solutionGroup]) {
-              console.log(`Solution group '${solutionGroup}' not found in mapping`);
+              core.setFailed(`Solution group '${solutionGroup}' not found in mapping`);
               return;
             }
             
             const apps = solutionGroups[solutionGroup];
             
-            // Find the current app index
-            const currentIndex = apps.indexOf(appName);
+            // Find the starting app index
+            const startIndex = apps.indexOf(startAppName);
             
-            if (currentIndex === -1) {
-              console.log(`App '${appName}' not found in solution group '${solutionGroup}'`);
+            if (startIndex === -1) {
+              core.setFailed(`App '${startAppName}' not found in solution group '${solutionGroup}'`);
               return;
             }
             
-            // Check if there's a next app to deploy
-            if (currentIndex >= apps.length - 1) {
-              console.log(`No more apps to deploy after ${appName} - this is the last app in the sequence.`);
-              return;
-            }
+            // Determine which apps to deploy
+            const appsToDeploy = deployDependent ? apps.slice(startIndex) : [startAppName];
+            const totalCount = appsToDeploy.length;
             
-            // Get the next app in sequence
-            const nextApp = apps[currentIndex + 1];
-            const nextSelection = `${solutionGroup} -> ${nextApp}`;
+            console.log(`Will deploy ${totalCount} app(s): ${appsToDeploy.join(', ')}`);
             
-            console.log(`Triggering next app in sequence: ${nextSelection}`);
-            
-            try {
+            // Deploy each app sequentially
+            for (let i = 0; i < appsToDeploy.length; i++) {
+              const appName = appsToDeploy[i];
+              const displayNumber = i + 1;
+              
+              console.log(`\n========================================`);
+              console.log(`Triggering deployment ${displayNumber} of ${totalCount}`);
+              console.log(`App: ${solutionGroup} -> ${appName}`);
+              console.log(`Environment: ${environment}`);
+              console.log(`========================================`);
+              
+              // Trigger the workflow
               await github.rest.actions.createWorkflowDispatch({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                workflow_id: 'DeploySolution.yml',
-                ref: process.env.TARGET_REF,
+                workflow_id: 'DeployOneSolution.yml',
+                ref: context.ref,
                 inputs: {
-                  solution: nextSelection,
-                  trigger_dependent_workflows: String(process.env.TRIGGER_DEPENDENT_WORKFLOWS)
+                  solution_group: solutionGroup,
+                  app_name: appName,
+                  environment: environment
                 }
               });
               
-              console.log(`Successfully triggered: ${nextSelection}`);
-            } catch (error) {
-              console.error(`Failed to trigger ${nextSelection}:`, error.message);
+              // Wait a moment for the workflow to be created
+              console.log(`Waiting for workflow to be created...`);
+              await new Promise(resolve => setTimeout(resolve, 5000));
+              
+              // Poll for workflow completion
+              let workflowRun = null;
+              let attempts = 0;
+              const maxAttempts = 180; // 15 minutes max wait (180 * 5 seconds)
+              
+              while (attempts < maxAttempts) {
+                // Get recent workflow runs
+                const runs = await github.rest.actions.listWorkflowRuns({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  workflow_id: 'DeployOneSolution.yml',
+                  per_page: 10
+                });
+                
+                // Find the most recent run (should be the one we just triggered)
+                const recentRun = runs.data.workflow_runs.find(run => 
+                  (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
+                );
+                
+                if (recentRun && recentRun.status === 'completed') {
+                  workflowRun = recentRun;
+                  console.log(`\nWorkflow ${displayNumber} completed with status: ${recentRun.conclusion}`);
+                  console.log(`View workflow run: ${recentRun.html_url}`);
+                  break;
+                }
+                
+                if (recentRun && attempts === 0) {
+                  console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
+                }
+                
+                if (attempts % 6 === 0) { // Log every 30 seconds
+                  console.log(`Waiting for workflow ${displayNumber} to complete... (${Math.floor(attempts * 5 / 60)}m ${(attempts * 5) % 60}s elapsed)`);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                attempts++;
+              }
+              
+              // Check if workflow succeeded
+              if (!workflowRun) {
+                core.setFailed(`Workflow ${displayNumber} (${appName}) did not complete within the timeout period (15 minutes)`);
+                throw new Error(`Workflow ${displayNumber} timed out`);
+              }
+              
+              if (workflowRun.conclusion !== 'success') {
+                core.setFailed(`Workflow ${displayNumber} (${appName}) failed with conclusion: ${workflowRun.conclusion}. View run: ${workflowRun.html_url}`);
+                throw new Error(`Workflow ${displayNumber} failed, stopping execution`);
+              }
+              
+              console.log(`✓ Workflow ${displayNumber} (${appName}) succeeded`);
+              
+              if (i < appsToDeploy.length - 1) {
+                console.log(`Proceeding to next deployment...`);
+              }
             }
+            
+            console.log(`\n========================================`);
+            console.log(`✓ All ${totalCount} deployment(s) completed successfully!`);
+            console.log(`========================================`);
