@@ -28,10 +28,10 @@ on:
   pull_request:
   push:
     paths-ignore:
-      - '!.github/workflows/**'
-      - '!SolutionGroups/solution-groups.json'
-      - '!docs/**'
-      - '!README.md'
+      - '.github/workflows/**'
+      - 'SolutionGroups/solution-groups.json'
+      - 'docs/**'
+      - 'README.md'
     branches:
       - main
 
