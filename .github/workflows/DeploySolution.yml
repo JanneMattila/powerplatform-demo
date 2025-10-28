@@ -24,13 +24,9 @@ on:
         default: false
         type: boolean
   pull_request:
-    paths:
-      - 'SolutionGroups/**/*_unmanaged.zip'
   push:
     branches:
       - main
-    paths:
-      - 'SolutionGroups/**/*_unmanaged.zip'
 
 permissions:
   contents: read
