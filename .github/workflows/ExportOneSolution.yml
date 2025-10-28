@@ -1,0 +1,115 @@
+name: Export One Solution
+run-name: 'Export ${{ inputs.solution_group }} -> ${{ inputs.app_name }}'
+
+on:
+  workflow_dispatch:
+    inputs:
+      solution_group:
+        description: 'Solution group name'
+        required: true
+        type: string
+      app_name:
+        description: 'App name to export'
+        required: true
+        type: string
+      branch_name:
+        description: 'Branch name for export'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  ExportOneSolution:
+    environment: Development
+    name: Export ${{ inputs.solution_group }} -> ${{ inputs.app_name }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5.0.0
+        with:
+          ref: ${{ inputs.branch_name }}
+          fetch-depth: 0
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1
+
+      - name: Install Power Platform Tools
+        uses: microsoft/powerplatform-actions/actions-install@v1
+
+      - name: Export unmanaged solution
+        uses: microsoft/powerplatform-actions/export-solution@v1
+        with:
+          environment-url: ${{ secrets.ENVIRONMENT_URL }}
+          app-id: ${{ secrets.CLIENT_ID }}
+          client-secret: ${{ secrets.CLIENT_SECRET }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          solution-name: ${{ inputs.app_name }}
+          solution-output-file: '${{ inputs.solution_group }}/${{ inputs.app_name }}_unmanaged.zip'
+          working-directory: './SolutionGroups/'
+          overwrite: true
+          managed: false
+
+      - name: Export managed solution
+        uses: microsoft/powerplatform-actions/export-solution@v1
+        with:
+          environment-url: ${{ secrets.ENVIRONMENT_URL }}
+          app-id: ${{ secrets.CLIENT_ID }}
+          client-secret: ${{ secrets.CLIENT_SECRET }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          solution-name: ${{ inputs.app_name }}
+          solution-output-file: '${{ inputs.solution_group }}/${{ inputs.app_name }}.zip'
+          working-directory: './SolutionGroups/'
+          overwrite: true
+          managed: true
+
+      - name: Commit changes
+        run: |
+          BRANCH_NAME="${{ inputs.branch_name }}"
+          
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          git add .
+            
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            # Commit the changes first
+            git commit -m "Export of ${{ inputs.solution_group }} -> ${{ inputs.app_name }} - Updated by ${{ github.actor }}"
+            
+            # Retry logic for push conflicts
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            RETRY_DELAY=5
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES to push changes"
+              
+              # Try to push
+              if git push origin "$BRANCH_NAME"; then
+                echo "Changes pushed successfully to branch '$BRANCH_NAME'"
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "Push failed, pulling latest changes and retrying..."
+                  
+                  # Pull with rebase to get latest changes
+                  if git pull --rebase origin "$BRANCH_NAME"; then
+                    echo "Rebased successfully, waiting $RETRY_DELAY seconds before retry..."
+                    sleep $RETRY_DELAY
+                    RETRY_DELAY=$((RETRY_DELAY + 5))  # Exponential backoff
+                  else
+                    echo "Rebase failed, trying to abort and continue..."
+                    git rebase --abort || true
+                    sleep $RETRY_DELAY
+                    RETRY_DELAY=$((RETRY_DELAY + 5))
+                  fi
+                else
+                  echo "Failed to push after $MAX_RETRIES attempts"
+                  exit 1
+                fi
+              fi
+            done
+          fi
