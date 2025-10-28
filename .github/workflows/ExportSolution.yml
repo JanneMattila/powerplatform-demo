@@ -12,10 +12,10 @@ on:
           - 'Library -> 1. LibraryTables'
           - 'Library -> 2. LibraryApp'
       branch_name:
-        description: 'Branch name for export (will be created if it does not exist)'
-        required: true
+        description: 'Branch name for export (e.g., "features/app-export"). Leave empty for auto-generated name with timestamp.'
+        required: false
         type: string
-        default: 'export-solution'
+
       export_dependencies:
         description: 'Export dependencies?'
         required: false
@@ -40,9 +40,18 @@ jobs:
           GIT_LFS_SKIP_SMUDGE: 1
 
       - name: Validate branch name
+        id: validate_branch
         run: |
           BRANCH_NAME="${{ inputs.branch_name }}"
           
+          # If no branch name provided, auto-generate with timestamp
+          if [ -z "$BRANCH_NAME" ]; then
+            TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
+            BRANCH_NAME="features/export-solution-${TIMESTAMP}"
+            echo "No branch name provided, auto-generated: $BRANCH_NAME"
+          fi
+          
+          # Validate branch name
           if [ "$BRANCH_NAME" = "main" ] || [ "$BRANCH_NAME" = "master" ]; then
             echo "Error: Cannot export to main/master branch"
             echo "Please specify a different branch name for exports"
@@ -50,10 +59,11 @@ jobs:
           fi
           
           echo "Branch name validation passed: $BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
 
       - name: Create or switch to branch
         run: |
-          BRANCH_NAME="${{ inputs.branch_name }}"
+          BRANCH_NAME="${{ steps.validate_branch.outputs.branch_name }}"
           
           # Configure git
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -99,7 +109,7 @@ jobs:
       - name: Orchestrate sequential exports
         uses: actions/github-script@v7
         env:
-          BRANCH_NAME: ${{ inputs.branch_name }}
+          BRANCH_NAME: ${{ steps.validate_branch.outputs.branch_name }}
           EXPORT_DEPENDENCIES: ${{ inputs.export_dependencies }}
           SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
           APP_NAME: ${{ steps.parse.outputs.app_name }}
@@ -233,7 +243,7 @@ jobs:
       - name: Create Pull Request
         uses: actions/github-script@v7
         env:
-          BRANCH_NAME: ${{ inputs.branch_name }}
+          BRANCH_NAME: ${{ steps.validate_branch.outputs.branch_name }}
           SOLUTION: ${{ inputs.solution }}
           EXPORT_DEPENDENCIES: ${{ inputs.export_dependencies }}
         with:
