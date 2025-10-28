@@ -24,9 +24,6 @@ on:
         default: false
         type: boolean
   pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - '!.github/workflows/**'
   push:
     branches:
       - main
