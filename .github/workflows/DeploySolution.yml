@@ -11,6 +11,8 @@ on:
         options:
           - 'Library -> 1. LibraryTables'
           - 'Library -> 2. LibraryApp'
+          - 'MyVacations -> 1. MyVacationsTables'
+          - 'MyVacations -> 2. MyVacationsApp'
       environment:
         description: 'Target environment'
         required: true
