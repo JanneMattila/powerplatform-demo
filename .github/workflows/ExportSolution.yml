@@ -296,3 +296,46 @@ jobs:
             console.log(`\n✓ Pull request created successfully!`);
             console.log(`PR #${pr.number}: ${pr.html_url}`);
 
+      - name: Trigger QA Deployment
+        uses: actions/github-script@v7
+        env:
+          BRANCH_NAME: ${{ steps.validate_branch.outputs.branch_name }}
+          SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
+          APP_NAME: ${{ steps.parse.outputs.app_name }}
+          EXPORT_DEPENDENCIES: ${{ inputs.export_dependencies }}
+        with:
+          script: |
+            const branchName = process.env.BRANCH_NAME;
+            const solutionGroup = process.env.SOLUTION_GROUP;
+            const appName = process.env.APP_NAME;
+            const exportDependencies = process.env.EXPORT_DEPENDENCIES === 'true';
+            
+            console.log(`\n========================================`);
+            console.log(`Triggering QA deployment orchestrator`);
+            console.log(`Solution: ${solutionGroup} -> ${appName}`);
+            console.log(`Deploy dependencies: ${exportDependencies}`);
+            console.log(`========================================`);
+            
+            try {
+              // Trigger the DeploySolution orchestrator workflow
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'DeploySolution.yml',
+                ref: branchName,
+                inputs: {
+                  solution: `${solutionGroup} -> ${appName}`,
+                  environment: 'QA',
+                  deploy_dependencies: String(exportDependencies)
+                }
+              });
+              
+              console.log(`\n✓ QA deployment orchestrator triggered successfully`);
+              console.log(`The orchestrator will detect all solutions and deploy them sequentially`);
+              console.log(`Check the Actions tab for deployment progress`);
+              
+            } catch (error) {
+              console.error(`Error triggering QA deployment: ${error.message}`);
+              console.log('You can manually trigger deployment or close/reopen the PR to retry');
+            }
+
