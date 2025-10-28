@@ -63,12 +63,34 @@ jobs:
           overwrite: true
           managed: true
 
+      - name: Create export metadata file
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          METADATA_FILE="./SolutionGroups/${{ inputs.solution_group }}/${{ inputs.app_name }}.md"
+          
+          echo "Creating metadata file: $METADATA_FILE"
+          
+          cat > "$METADATA_FILE" << EOF
+          # Export Metadata
+          
+          **Solution:** ${{ inputs.app_name }}
+          **Solution Group:** ${{ inputs.solution_group }}
+          **Exported:** $TIMESTAMP
+          **Exported by:** ${{ github.actor }}
+          **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          **Branch:** ${{ inputs.branch_name }}
+          EOF
+          
+          echo "Metadata file created successfully"
+
       - name: Commit changes
         run: |
           BRANCH_NAME="${{ inputs.branch_name }}"
           
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+
+          echo "Committing changes for export of ${{ inputs.solution_group }} -> ${{ inputs.app_name }}"
           
           git add .
             
