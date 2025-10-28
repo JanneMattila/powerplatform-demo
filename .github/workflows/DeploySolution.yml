@@ -24,16 +24,9 @@ on:
         default: false
         type: boolean
   pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - 'SolutionGroups/**'
-      - '!.github/workflows/**'
   push:
     branches:
       - main
-    paths:
-      - 'SolutionGroups/**'
-      - '!.github/workflows/**'
 
 permissions:
   contents: read
