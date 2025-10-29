@@ -6,5 +6,8 @@
     "MyVacations": [
         "MyVacationsTables",
         "MyVacationsApp"
+    ],
+    "Garage": [
+        "Garage"
     ]
 }

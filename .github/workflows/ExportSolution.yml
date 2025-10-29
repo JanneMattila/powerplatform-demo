@@ -13,6 +13,7 @@ on:
           - 'Library -> 2. LibraryApp'
           - 'MyVacations -> 1. MyVacationsTables'
           - 'MyVacations -> 2. MyVacationsApp'
+          - 'Garage -> 1. Garage'
       branch_name:
         description: 'Branch name for export (e.g., "features/app-export"). Leave empty for auto-generated name with timestamp.'
         required: false
