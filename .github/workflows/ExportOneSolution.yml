@@ -37,15 +37,23 @@ jobs:
       - name: Install Power Platform Tools
         uses: microsoft/powerplatform-actions/actions-install@v1
 
-      - name: Update solution version
-        uses: microsoft/powerplatform-actions/update-solution-version@v1
-        with:
-          environment-url: ${{ secrets.ENVIRONMENT_URL }}
-          app-id: ${{ secrets.CLIENT_ID }}
-          client-secret: ${{ secrets.CLIENT_SECRET }}
-          tenant-id: ${{ secrets.TENANT_ID }}
-          solution-name: ${{ inputs.app_name }}
-          strategy: solution
+      # - name: Create version number
+      #   id: version
+      #   run: |
+      #     TIMESTAMP=$(date -u +"%Y.%m.%d")
+      #     SOLUTION_VERSION="$TIMESTAMP.$GITHUB_RUN_NUMBER"
+      #     echo "Generated solution version: $SOLUTION_VERSION"
+      #     echo "solution=$SOLUTION_VERSION" >> $GITHUB_OUTPUT
+
+      # - name: Set solution version
+      #   uses: microsoft/powerplatform-actions/set-online-solution-version@v1
+      #   with:
+      #     environment-url: ${{ secrets.ENVIRONMENT_URL }}
+      #     app-id: ${{ secrets.CLIENT_ID }}
+      #     client-secret: ${{ secrets.CLIENT_SECRET }}
+      #     tenant-id: ${{ secrets.TENANT_ID }}
+      #     solution-name: ${{ inputs.app_name }}
+      #     version: ${{ steps.version.outputs.solution }}
 
       - name: Export unmanaged solution
         uses: microsoft/powerplatform-actions/export-solution@v1
