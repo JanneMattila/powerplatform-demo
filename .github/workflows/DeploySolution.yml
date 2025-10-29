@@ -64,7 +64,7 @@ jobs:
           CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' | grep '_unmanaged.zip$' || true)
           
           if [ -z "$CHANGED_FILES" ]; then
-            echo "Error: No *_unmanaged.zip files found in PR changes"
+            echo "No *_unmanaged.zip files found in PR changes. Assuming that this is not a solution deployment PR."
             SOLUTIONS="[]"
             echo "solutions=$SOLUTIONS" >> $GITHUB_OUTPUT
             exit 0
