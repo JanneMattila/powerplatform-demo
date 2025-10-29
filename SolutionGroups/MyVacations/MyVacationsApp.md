@@ -4,10 +4,10 @@
 
 **Solution Group:** MyVacations
 
-**Exported:** 2025-10-28 13:20:21 UTC
+**Exported:** 2025-10-29 13:08:10 UTC
 
 **Exported by:** github-actions[bot]
 
-**Workflow Run:** https://github.com/JanneMattila/powerplatform-demo/actions/runs/18876130899
+**Workflow Run:** https://github.com/JanneMattila/powerplatform-demo/actions/runs/18908894664
 
-**Branch:** features/export-solution-20251028-131731
+**Branch:** features/export-solution-20251029-130658
