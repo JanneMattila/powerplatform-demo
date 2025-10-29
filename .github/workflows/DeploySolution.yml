@@ -13,6 +13,7 @@ on:
           - 'Library -> 2. LibraryApp'
           - 'MyVacations -> 1. MyVacationsTables'
           - 'MyVacations -> 2. MyVacationsApp'
+          - 'Garage -> 1. Garage'
       environment:
         description: 'Target environment'
         required: true
