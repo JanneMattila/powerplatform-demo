@@ -67,7 +67,7 @@ jobs:
             echo "Error: No *_unmanaged.zip files found in PR changes"
             SOLUTIONS="[]"
             echo "solutions=$SOLUTIONS" >> $GITHUB_OUTPUT
-            return
+            exit 0
           fi
           
           echo "Changed files:"
