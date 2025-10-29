@@ -39,6 +39,21 @@ jobs:
       - name: Pull only needed LFS files
         run: git lfs pull --include="SolutionGroups/${{ inputs.solution_group }}/${{ inputs.app_name }}.zip"
 
+      - name: Detect deployment setting file
+        id: detect
+        run: |
+          echo "Detecting if deployment settings file exists..."
+          DEPLOYMENT_SETTINGS_FILE="SolutionGroups/${{ inputs.solution_group }}/${{ inputs.app_name }}.${{ inputs.environment }}.json"
+          if [ -f "$DEPLOYMENT_SETTINGS_FILE" ]; then
+            echo "Found deployment settings file: $DEPLOYMENT_SETTINGS_FILE"
+            echo "deployment_settings_file=$DEPLOYMENT_SETTINGS_FILE" >> $GITHUB_OUTPUT
+            echo "use_deployment_settings=true" >> $GITHUB_OUTPUT
+          else
+            echo "No deployment settings file found."
+            echo "deployment_settings_file=" >> $GITHUB_OUTPUT
+            echo "use_deployment_settings=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Import managed solution
         uses: microsoft/powerplatform-actions/import-solution@v1
         with:
@@ -48,4 +63,6 @@ jobs:
           tenant-id: ${{ secrets.TENANT_ID }}
           solution-file: '${{ inputs.solution_group }}/${{ inputs.app_name }}.zip'
           working-directory: './SolutionGroups/'
+          deployment-settings-file: ${{ steps.detect.outputs.deployment_settings_file }}
+          use-deployment-settings-file: ${{ steps.detect.outputs.use_deployment_settings }}
           publish-changes: true
