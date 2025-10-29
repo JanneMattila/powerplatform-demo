@@ -34,10 +34,6 @@ Assign the service principal as an application user in the target Power Platform
 
 ![Service principal Permissions to environments](./images/environments-application-users.png)
 
-GitHub environments configured with the necessary secrets:
-
-![GitHub environment secrets](./images/github-environments.png)
-
 > [!IMPORTANT]
 > Note: You can have **application users** per environment or use the **same application user** across multiple environments.
 
@@ -49,9 +45,13 @@ Here's an example GitHub secret configuration:
 
 ![GitHub secrets](./images/github-secrets.png)
 
-| Secret Name                 | Description                                      |
-| --------------------------- | ------------------------------------------------ |
-| CLIENT_ID                   | Application (client) ID of the service principal |
-| TENANT_ID                   | Directory (tenant) ID of the service principal   |
-| CLIENT_SECRET               | Client secret of the service principal           |
-| ENVIRONMENT_URL             | URL of the target Power Platform environment     |
+GitHub environments configured with the necessary secrets:
+
+![GitHub environment secrets](./images/github-environments.png)
+
+| Secret Name     | Description                                      | Example                              |
+| --------------- | ------------------------------------------------ | ------------------------------------ |
+| CLIENT_ID       | Application (client) ID of the service principal | 5248da5b-8afb-4382-a037-5196daebac55 |
+| TENANT_ID       | Directory (tenant) ID of the service principal   | 6f6b9051-7e7c-4b41-bc5e-bf027ce1951f |
+| CLIENT_SECRET   | Client secret of the service principal           | `auto-generated-password`            |
+| ENVIRONMENT_URL | URL of the target Power Platform environment     | https://org2f3b2369.crm.dynamics.com |
