@@ -11,6 +11,10 @@ Two GitHub Actions workflows manage the Solution Groups:
 
 Both workflows support **dependency/sequential processing**, allowing automatic export or deployment of dependent solutions in the correct order.
 
+Implementation uses
+[Power Platform Actions](https://github.com/microsoft/powerplatform-actions/)
+for automations.
+
 ## Directory Structure
 
 Here are the most important files and directories from our example repository:
