@@ -74,17 +74,7 @@ jobs:
           NEW_VERSION="$MAJOR.$MINOR.$BUILD.$NEW_REVISION"
           
           echo "New solution version: $NEW_VERSION"
-          echo "solution=$NEW_VERSION" >> $GITHUB_OUTPUT
-
-      - name: Set solution version
-        uses: microsoft/powerplatform-actions/set-online-solution-version@v1
-        with:
-          environment-url: ${{ secrets.ENVIRONMENT_URL }}
-          app-id: ${{ secrets.CLIENT_ID }}
-          client-secret: ${{ secrets.CLIENT_SECRET }}
-          tenant-id: ${{ secrets.TENANT_ID }}
-          solution-name: ${{ inputs.app_name }}
-          version: ${{ steps.version.outputs.solution }}
+          pac solution online-version --solution-name "${{ inputs.app_name }}" --solution-version "$NEW_VERSION"
 
       # =================================================
       # Other versioning options
