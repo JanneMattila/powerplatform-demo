@@ -43,7 +43,7 @@ jobs:
         id: version
         run: |
           pac auth create \
-            --url "${{ secrets.ENVIRONMENT_URL }}" \
+            --environment "${{ secrets.ENVIRONMENT_URL }}" \
             --applicationId "${{ secrets.CLIENT_ID }}" \
             --clientSecret "${{ secrets.CLIENT_SECRET }}" \
             --tenant "${{ secrets.TENANT_ID }}"
