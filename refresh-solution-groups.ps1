@@ -83,7 +83,10 @@ function Update-WorkflowFile {
     
     Write-Host "`nUpdating workflow file: $FilePath" -ForegroundColor Green
     
-    $content = Get-Content $FilePath -Raw
+    # Resolve to absolute path and normalize
+    $absolutePath = Resolve-Path $FilePath -ErrorAction Stop
+    
+    $content = Get-Content $absolutePath -Raw
     
     # Find the solution input section and replace the options
     # Pattern matches from solution: to the next top-level key (branch_name or environment)
@@ -106,7 +109,7 @@ function Update-WorkflowFile {
     
     # Write back to file with UTF8 encoding without BOM
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
-    [System.IO.File]::WriteAllText($FilePath, $newContent, $utf8NoBom)
+    [System.IO.File]::WriteAllText($absolutePath.Path, $newContent, $utf8NoBom)
     Write-Host "  Updated successfully" -ForegroundColor Green
     return $true
 }
