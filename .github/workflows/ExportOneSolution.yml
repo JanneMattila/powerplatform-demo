@@ -37,14 +37,90 @@ jobs:
       - name: Install Power Platform Tools
         uses: microsoft/powerplatform-actions/actions-install@v1
 
+      - name: Get current solution version and auto-increment
+        id: version
+        run: |
+          pac auth create \
+            --url "${{ secrets.ENVIRONMENT_URL }}" \
+            --applicationId "${{ secrets.CLIENT_ID }}" \
+            --clientSecret "${{ secrets.CLIENT_SECRET }}" \
+            --tenant "${{ secrets.TENANT_ID }}"
+
+            # Query current solution version
+          SOLUTION_LIST=$(pac solution list)
+          
+          # Parse the table output to find the solution and extract version
+          # Table format: Unique Name | Friendly Name | Version | Managed
+          CURRENT_VERSION=$(echo "$SOLUTION_LIST" | grep "^${{ inputs.app_name }}\s" | awk '{print $3}')
+          
+          if [ -z "$CURRENT_VERSION" ]; then
+            echo "Error: Could not find solution '${{ inputs.app_name }}'"
+            exit 1
+          fi
+          
+          echo "Current solution version: $CURRENT_VERSION"
+          
+          # Parse version components (e.g., 1.0.0.5 -> 1 0 0 5)
+          IFS='.' read -r MAJOR MINOR BUILD REVISION <<< "$CURRENT_VERSION"
+          
+          # Handle cases where version might be incomplete (e.g., "1.0" instead of "1.0.0.0")
+          MAJOR=${MAJOR:-1}
+          MINOR=${MINOR:-0}
+          BUILD=${BUILD:-0}
+          REVISION=${REVISION:-0}
+          
+          # Increment revision number
+          NEW_REVISION=$((REVISION + 1))
+          NEW_VERSION="$MAJOR.$MINOR.$BUILD.$NEW_REVISION"
+          
+          echo "New solution version: $NEW_VERSION"
+          echo "solution=$NEW_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Set solution version
+        uses: microsoft/powerplatform-actions/set-online-solution-version@v1
+        with:
+          environment-url: ${{ secrets.ENVIRONMENT_URL }}
+          app-id: ${{ secrets.CLIENT_ID }}
+          client-secret: ${{ secrets.CLIENT_SECRET }}
+          tenant-id: ${{ secrets.TENANT_ID }}
+          solution-name: ${{ inputs.app_name }}
+          version: ${{ steps.version.outputs.solution }}
+
       # =================================================
-      # Here we could add versioning if needed in future:
+      # Other versioning options
       # =================================================
       # - name: Create version number
       #   id: version
       #   run: |
-      #     TIMESTAMP=$(date -u +"%Y.%m.%d")
-      #     SOLUTION_VERSION="$TIMESTAMP.$GITHUB_RUN_NUMBER"
+
+      #     # Option 1:
+      #     # TIMESTAMP=$(date -u +"%Y.%m.%d")
+      #     # SOLUTION_VERSION="$TIMESTAMP.$GITHUB_RUN_NUMBER"
+
+      #     # Option 2:
+      #     # Reference date: 2025-01-01
+      #     REFERENCE_DATE="2025-01-01"
+      #     CURRENT_DATE=$(date -u +"%Y-%m-%d")
+          
+      #     # Convert dates to seconds since epoch
+      #     REFERENCE_SECONDS=$(date -d "$REFERENCE_DATE" +%s)
+      #     CURRENT_SECONDS=$(date -d "$CURRENT_DATE" +%s)
+          
+      #     # Calculate total days difference
+      #     TOTAL_DAYS=$(( (CURRENT_SECONDS - REFERENCE_SECONDS) / 86400 ))
+          
+      #     # Calculate year, month, and day deltas
+      #     YEAR_DELTA=$(( (TOTAL_DAYS / 365) + 1 ))
+      #     REMAINING_DAYS=$(( TOTAL_DAYS % 365 ))
+      #     MONTH_DELTA=$(( REMAINING_DAYS / 30 ))
+      #     DAY_DELTA=$(( REMAINING_DAYS % 30 ))
+          
+      #     SOLUTION_VERSION="$YEAR_DELTA.$MONTH_DELTA.$DAY_DELTA.$GITHUB_RUN_NUMBER"
+          
+      #     echo "Reference date: $REFERENCE_DATE"
+      #     echo "Current date: $CURRENT_DATE"
+      #     echo "Total days difference: $TOTAL_DAYS"
+      #     echo "Version components: Year=$YEAR_DELTA, Month=$MONTH_DELTA, Day=$DAY_DELTA, Run=$GITHUB_RUN_NUMBER"
       #     echo "Generated solution version: $SOLUTION_VERSION"
       #     echo "solution=$SOLUTION_VERSION" >> $GITHUB_OUTPUT
 
