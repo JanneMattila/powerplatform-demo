@@ -46,7 +46,7 @@ jobs:
           DEPLOYMENT_SETTINGS_FILE="SolutionGroups/${{ inputs.solution_group }}/${{ inputs.app_name }}.${{ inputs.environment }}.json"
           if [ -f "$DEPLOYMENT_SETTINGS_FILE" ]; then
             echo "Found deployment settings file: $DEPLOYMENT_SETTINGS_FILE"
-            echo "deployment_settings_file=$DEPLOYMENT_SETTINGS_FILE" >> $GITHUB_OUTPUT
+            echo "deployment_settings_file=${{ inputs.solution_group }}/${{ inputs.app_name }}.${{ inputs.environment }}.json" >> $GITHUB_OUTPUT
             echo "use_deployment_settings=true" >> $GITHUB_OUTPUT
           else
             echo "No deployment settings file found."
