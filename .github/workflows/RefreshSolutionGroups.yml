@@ -26,14 +26,20 @@ jobs:
       - name: Check for changes
         id: check_changes
         run: |
-          # Check if there are any changes to workflow files
-          git diff --exit-code .github/workflows/ExportSolution.yml .github/workflows/DeploySolution.yml
-          if [ $? -eq 0 ]; then
+          # Check if there are any changes to workflow files (working directory)
+          if git diff --quiet .github/workflows/ExportSolution.yml .github/workflows/DeploySolution.yml; then
             echo "No changes detected"
             echo "has_changes=false" >> $GITHUB_OUTPUT
           else
             echo "Changes detected"
             echo "has_changes=true" >> $GITHUB_OUTPUT
+            
+            # Show what changed
+            echo "Changes in ExportSolution.yml:"
+            git diff .github/workflows/ExportSolution.yml | head -20
+            echo ""
+            echo "Changes in DeploySolution.yml:"
+            git diff .github/workflows/DeploySolution.yml | head -20
           fi
 
       - name: Commit and push changes
