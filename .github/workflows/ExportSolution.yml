@@ -185,16 +185,34 @@ jobs:
               // Poll for workflow completion
               let workflowRun = null;
               let attempts = 0;
-              const maxAttempts = 180; // 15 minutes max wait (180 * 5 seconds)
+              const maxAttempts = 360; // 30 minutes max wait (360 * 5 seconds)
               
               while (attempts < maxAttempts) {
-                // Get recent workflow runs
-                const runs = await github.rest.actions.listWorkflowRuns({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  workflow_id: 'ExportOneSolution.yml',
-                  per_page: 10
-                });
+                // Get recent workflow runs with retry logic
+                let runs;
+                let retryCount = 0;
+                const maxRetries = 3;
+                
+                while (retryCount < maxRetries) {
+                  try {
+                    runs = await github.rest.actions.listWorkflowRuns({
+                      owner: context.repo.owner,
+                      repo: context.repo.repo,
+                      workflow_id: 'ExportOneSolution.yml',
+                      per_page: 10
+                    });
+                    break; // Success, exit retry loop
+                  } catch (error) {
+                    retryCount++;
+                    if (retryCount >= maxRetries) {
+                      console.error(`Failed to fetch workflow runs after ${maxRetries} retries: ${error.message}`);
+                      throw error;
+                    }
+                    const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 10000); // Exponential backoff, max 10s
+                    console.log(`API call failed (attempt ${retryCount}/${maxRetries}), retrying in ${retryDelay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, retryDelay));
+                  }
+                }
                 
                 // Find the most recent run for this branch (should be the one we just triggered)
                 const recentRun = runs.data.workflow_runs.find(run => 
