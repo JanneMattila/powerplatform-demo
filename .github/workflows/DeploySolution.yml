@@ -239,7 +239,7 @@ jobs:
             console.log(`========================================`);
 
   OrchestrateProductionDeploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     environment: Production
     runs-on: ubuntu-latest
     name: Orchestrate Production Deployment
