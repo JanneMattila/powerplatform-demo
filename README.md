@@ -2,6 +2,22 @@
 
 This repository contains the configuration and metadata for Solution Groups and their associated Power Platform solutions. Solution Groups are used to organize and manage deployments and exports of related solutions with dependency management.
 
+This implementation enables the following workflow:
+
+```mermaid
+gitGraph:
+    commit
+    branch "features/update-library-app"
+    checkout "features/update-library-app"
+    commit id: "Export from Dev" type: HIGHLIGHT
+    commit id: "LibraryTables"
+    commit id: "LibraryApp"
+    commit id: "Deploy to QA" type: HIGHLIGHT
+    checkout main
+    merge "features/update-library-app"
+    commit id: "Deploy to Prod" type: HIGHLIGHT
+```
+
 ## Overview
 
 Two GitHub Actions workflows manage the Solution Groups:
