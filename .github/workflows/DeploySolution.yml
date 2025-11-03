@@ -239,7 +239,7 @@ jobs:
             console.log(`========================================`);
 
   OrchestrateProductionDeploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment: Production
     runs-on: ubuntu-latest
     name: Orchestrate Production Deployment
@@ -435,7 +435,7 @@ jobs:
             console.log(`========================================`);
 
   OrchestrateManualDeploy:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && (inputs.environment != 'Production' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     name: Orchestrate ${{ inputs.environment || '' }} Deployment
     steps:
