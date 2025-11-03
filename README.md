@@ -6,7 +6,7 @@ This implementation enables the following workflow:
 
 ```mermaid
 gitGraph:
-    commit
+    commit id: "Start export"
     branch "features/update-library-app"
     checkout "features/update-library-app"
     commit id: "Export from Dev" type: HIGHLIGHT
