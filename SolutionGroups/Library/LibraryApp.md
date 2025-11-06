@@ -4,10 +4,12 @@
 
 **Solution Group:** Library
 
-**Exported:** 2025-11-03 10:52:19 UTC
+**Version:** 1.0.0.5
+
+**Exported:** 2025-11-06 05:56:29 UTC
 
 **Exported by:** github-actions[bot]
 
-**Workflow Run:** https://github.com/JanneMattila/powerplatform-demo/actions/runs/19032002050
+**Workflow Run:** https://github.com/JanneMattila/powerplatform-demo/actions/runs/19126296513
 
-**Branch:** features/export-solution-20251103-104757
+**Branch:** features/export-solution-20251106-055223
