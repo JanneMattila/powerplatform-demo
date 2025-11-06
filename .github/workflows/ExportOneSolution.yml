@@ -76,6 +76,7 @@ jobs:
           NEW_VERSION="$MAJOR.$MINOR.$BUILD.$NEW_REVISION"
           
           echo "New solution version: $NEW_VERSION"
+          echo "solution=$NEW_VERSION" >> $GITHUB_OUTPUT
           pac solution online-version --solution-name "${{ inputs.app_name }}" --solution-version "$NEW_VERSION"
 
       # =================================================
@@ -155,6 +156,7 @@ jobs:
       - name: Create export metadata file
         run: |
           TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          NET_VERSION="${{ steps.version.outputs.solution }}"
           METADATA_FILE="./SolutionGroups/${{ inputs.solution_group }}/${{ inputs.app_name }}.md"
           
           echo "Creating metadata file: $METADATA_FILE"
@@ -165,6 +167,8 @@ jobs:
           **Solution:** ${{ inputs.app_name }}
 
           **Solution Group:** ${{ inputs.solution_group }}
+
+          **Version:** $NET_VERSION
 
           **Exported:** $TIMESTAMP
 
