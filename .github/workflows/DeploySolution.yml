@@ -28,14 +28,14 @@ on:
         default: false
         type: boolean
   pull_request:
-  push:
-    paths-ignore:
-      - '.github/workflows/**'
-      - 'SolutionGroups/solution-groups.json'
-      - 'docs/**'
-      - 'README.md'
-    branches:
-      - main
+  # push:
+  #   paths-ignore:
+  #     - '.github/workflows/**'
+  #     - 'SolutionGroups/solution-groups.json'
+  #     - 'docs/**'
+  #     - 'README.md'
+  #   branches:
+  #     - main
 
 permissions:
   contents: read
