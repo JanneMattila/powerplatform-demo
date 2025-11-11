@@ -21,6 +21,7 @@ on:
         type: choice
         options:
           - 'QA'
+          - 'Stage'
           - 'Production'
       deploy_dependencies:
         description: 'Deploy dependencies?'
