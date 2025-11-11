@@ -218,7 +218,7 @@ jobs:
                 // Find the most recent run for this branch (should be the one we just triggered)
                 const recentRun = runs.data.workflow_runs.find(run => 
                   run.head_branch === branchName &&
-                  (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
+                  (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued' || run.status === 'waiting')
                 );
                 
                 if (recentRun && recentRun.status === 'completed') {

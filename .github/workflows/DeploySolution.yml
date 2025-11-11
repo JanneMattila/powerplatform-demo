@@ -194,7 +194,7 @@ jobs:
                 // Find the most recent run for this branch (should be the one we just triggered)
                 const recentRun = runs.data.workflow_runs.find(run => 
                   run.head_branch === headRef &&
-                  (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
+                  (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued' || run.status === 'waiting')
                 );
                 
                 if (recentRun && !workflowStartLogged) {
@@ -390,7 +390,7 @@ jobs:
   #               // Find the most recent run for main branch (should be the one we just triggered)
   #               const recentRun = runs.data.workflow_runs.find(run => 
   #                 run.head_branch === 'main' &&
-  #                 (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
+  #                 (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued' || run.status === 'waiting')
   #               );
                 
   #               if (recentRun && !workflowStartLogged) {
@@ -566,12 +566,10 @@ jobs:
                   }
                 }
                 
-                // Find the most recent run (should be the one we just triggered)
-                const recentRun = runs.data.workflow_runs.find(run => 
-                  (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued')
-                );
-                
-                if (recentRun && !workflowStartLogged) {
+              // Find the most recent run (should be the one we just triggered)
+              const recentRun = runs.data.workflow_runs.find(run => 
+                (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued' || run.status === 'waiting')
+              );                if (recentRun && !workflowStartLogged) {
                   console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
                   workflowStartLogged = true;
                 }
