@@ -1,5 +1,5 @@
-name: Export Solutions (Orchestrator)
-run-name: Export ${{ inputs.solution }}${{ inputs.export_dependencies && ' with dependencies' || '' }}
+name: Export Solutions (Script-based)
+run-name: "Export ${{ inputs.solution }}${{ inputs.export_dependencies && ' with dependencies' || '' }}"
 
 on:
   workflow_dispatch:
@@ -33,15 +33,19 @@ permissions:
 
 jobs:
   OrchestrateExport:
+    environment: Development
     runs-on: ubuntu-latest
     name: Orchestrate Export
     steps:
       - name: Check out
         uses: actions/checkout@v5.0.0
-        with:
-          fetch-depth: 0
         env:
           GIT_LFS_SKIP_SMUDGE: 1
+
+      - name: Install Power Platform Tools
+        uses: microsoft/powerplatform-actions/actions-install@v1
+        with:
+          add-tools-to-path: true
 
       - name: Validate branch name
         id: validate_branch
@@ -70,8 +74,8 @@ jobs:
           BRANCH_NAME="${{ steps.validate_branch.outputs.branch_name }}"
           
           # Configure git
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
+          git config --local user.name "${{ github.event.pusher.name || github.actor }}"
+          git config --local user.email "${{ github.event.pusher.email || format('{0}@users.noreply.github.com', github.actor) }}"
           
           # Fetch all branches
           git fetch origin
@@ -110,157 +114,152 @@ jobs:
           echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
           echo "Exporting: $SOLUTION_GROUP -> $APP_NAME"
 
-      - name: Orchestrate sequential exports
-        uses: actions/github-script@v7
-        env:
-          BRANCH_NAME: ${{ steps.validate_branch.outputs.branch_name }}
-          EXPORT_DEPENDENCIES: ${{ inputs.export_dependencies }}
-          SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
-          APP_NAME: ${{ steps.parse.outputs.app_name }}
-        with:
-          script: |
-            const fs = require('fs');
+      - name: Execute sequential exports
+        run: |
+          SOLUTION_GROUP="${{ steps.parse.outputs.solution_group }}"
+          START_APP_NAME="${{ steps.parse.outputs.app_name }}"
+          EXPORT_DEPENDENCIES="${{ inputs.export_dependencies }}"
+          
+          echo "Starting sequential export for: $SOLUTION_GROUP -> $START_APP_NAME"
+          echo "Export dependencies: $EXPORT_DEPENDENCIES"
+          
+          # Read the solution groups mapping
+          SOLUTION_GROUPS=$(cat ./SolutionGroups/solution-groups.json)
+          
+          # Get apps array for the selected solution group
+          APPS=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" '.[$sg] // empty | .[]')
+          
+          if [ -z "$APPS" ]; then
+            echo "Error: Solution group '$SOLUTION_GROUP' not found in mapping"
+            exit 1
+          fi
+          
+          # Convert to array
+          APPS_ARRAY=()
+          while IFS= read -r app; do
+            APPS_ARRAY+=("$app")
+          done <<< "$APPS"
+          
+          # Find the starting app index
+          START_INDEX=-1
+          for i in "${!APPS_ARRAY[@]}"; do
+            if [ "${APPS_ARRAY[$i]}" = "$START_APP_NAME" ]; then
+              START_INDEX=$i
+              break
+            fi
+          done
+          
+          if [ $START_INDEX -eq -1 ]; then
+            echo "Error: App '$START_APP_NAME' not found in solution group '$SOLUTION_GROUP'"
+            exit 1
+          fi
+          
+          # Determine which apps to export
+          if [ "$EXPORT_DEPENDENCIES" = "true" ]; then
+            APPS_TO_EXPORT=("${APPS_ARRAY[@]:$START_INDEX}")
+          else
+            APPS_TO_EXPORT=("$START_APP_NAME")
+          fi
+          
+          TOTAL_COUNT=${#APPS_TO_EXPORT[@]}
+          echo "Will export $TOTAL_COUNT app(s): ${APPS_TO_EXPORT[*]}"
+          
+          # Authenticate with Power Platform
+          echo "Authenticating with Power Platform..."
+          pac auth create \
+          --environment "$ENVIRONMENT_URL" \
+          --applicationId "$CLIENT_ID" \
+          --clientSecret "$CLIENT_SECRET" \
+          --tenant "$TENANT_ID" \
+          --accept-cleartext-caching
+
+          # Export each app sequentially
+          for i in "${!APPS_TO_EXPORT[@]}"; do
+            APP_NAME="${APPS_TO_EXPORT[$i]}"
+            DISPLAY_NUMBER=$((i + 1))
             
-            // Use parsed values from the parse step
-            const solutionGroup = process.env.SOLUTION_GROUP;
-            const startAppName = process.env.APP_NAME;
-            const branchName = process.env.BRANCH_NAME;
-            const triggerDependent = process.env.EXPORT_DEPENDENCIES === 'true';
+            echo ""
+            echo "========================================"
+            echo "Exporting app $DISPLAY_NUMBER of $TOTAL_COUNT"
+            echo "App: $SOLUTION_GROUP -> $APP_NAME"
+            echo "========================================"
             
-            console.log(`Starting sequential export for: ${solutionGroup} -> ${startAppName}`);
-            console.log(`Target branch: ${branchName}`);
-            console.log(`Trigger dependent workflows: ${triggerDependent}`);
+            # Execute the export script
+            ./export-solution.sh \
+              "$SOLUTION_GROUP" \
+              "$APP_NAME"
             
-            // Read the solution groups mapping
-            const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
+            if [ $? -ne 0 ]; then
+              echo "Error: Export failed for $APP_NAME"
+              exit 1
+            fi
             
-            // Get apps array for the selected solution group
-            if (!solutionGroups[solutionGroup]) {
-              core.setFailed(`Solution group '${solutionGroup}' not found in mapping`);
-              return;
-            }
+            echo "✓ Export $DISPLAY_NUMBER ($APP_NAME) succeeded"
             
-            const apps = solutionGroups[solutionGroup];
+            if [ $i -lt $((TOTAL_COUNT - 1)) ]; then
+              echo "Proceeding to next export..."
+            fi
+          done
+          
+          pac auth clear
+
+          echo ""
+          echo "========================================"
+          echo "✓ All $TOTAL_COUNT export(s) completed successfully!"
+          echo "========================================"
+
+      - name: Commit changes
+        run: |
+          BRANCH_NAME="${{ steps.validate_branch.outputs.branch_name }}"
+          
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          echo "Committing changes for export of ${{ steps.parse.outputs.solution_group }} -> ${{ steps.parse.outputs.app_name }}"
+          
+          git add .
             
-            // Find the starting app index
-            const startIndex = apps.indexOf(startAppName);
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            # Commit the changes first
+            git commit -m "Export of ${{ inputs.solution }} - Updated by ${{ github.actor }}"
             
-            if (startIndex === -1) {
-              core.setFailed(`App '${startAppName}' not found in solution group '${solutionGroup}'`);
-              return;
-            }
+            # Retry logic for push conflicts
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            RETRY_DELAY=5
             
-            // Determine which apps to export
-            const appsToExport = triggerDependent ? apps.slice(startIndex) : [startAppName];
-            const totalCount = appsToExport.length;
-            
-            console.log(`Will export ${totalCount} app(s): ${appsToExport.join(', ')}`);
-            
-            // Export each app sequentially
-            for (let i = 0; i < appsToExport.length; i++) {
-              const appName = appsToExport[i];
-              const displayNumber = i + 1;
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES to push changes"
               
-              console.log(`\n========================================`);
-              console.log(`Triggering workflow ${displayNumber} of ${totalCount}`);
-              console.log(`App: ${solutionGroup} -> ${appName}`);
-              console.log(`========================================`);
-              
-              // Trigger the workflow
-              await github.rest.actions.createWorkflowDispatch({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                workflow_id: 'ExportOneSolution.yml',
-                ref: branchName,
-                inputs: {
-                  solution_group: solutionGroup,
-                  app_name: appName,
-                  branch_name: branchName
-                }
-              });
-              
-              // Wait a moment for the workflow to be created
-              console.log(`Waiting for workflow to be created...`);
-              await new Promise(resolve => setTimeout(resolve, 5000));
-              
-              // Poll for workflow completion
-              let workflowRun = null;
-              let attempts = 0;
-              const maxAttempts = 360; // 30 minutes max wait (360 * 5 seconds)
-              
-              while (attempts < maxAttempts) {
-                // Get recent workflow runs with retry logic
-                let runs;
-                let retryCount = 0;
-                const maxRetries = 3;
-                
-                while (retryCount < maxRetries) {
-                  try {
-                    runs = await github.rest.actions.listWorkflowRuns({
-                      owner: context.repo.owner,
-                      repo: context.repo.repo,
-                      workflow_id: 'ExportOneSolution.yml',
-                      per_page: 10
-                    });
-                    break; // Success, exit retry loop
-                  } catch (error) {
-                    retryCount++;
-                    if (retryCount >= maxRetries) {
-                      console.error(`Failed to fetch workflow runs after ${maxRetries} retries: ${error.message}`);
-                      throw error;
-                    }
-                    const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 10000); // Exponential backoff, max 10s
-                    console.log(`API call failed (attempt ${retryCount}/${maxRetries}), retrying in ${retryDelay}ms...`);
-                    await new Promise(resolve => setTimeout(resolve, retryDelay));
-                  }
-                }
-                
-                // Find the most recent run for this branch (should be the one we just triggered)
-                const recentRun = runs.data.workflow_runs.find(run => 
-                  run.head_branch === branchName &&
-                  (run.status === 'completed' || run.status === 'in_progress' || run.status === 'queued' || run.status === 'waiting')
-                );
-                
-                if (recentRun && recentRun.status === 'completed') {
-                  workflowRun = recentRun;
-                  console.log(`\nWorkflow ${displayNumber} completed with status: ${recentRun.conclusion}`);
-                  console.log(`View workflow run: ${recentRun.html_url}`);
-                  break;
-                }
-                
-                if (recentRun && attempts === 0) {
-                  console.log(`Workflow ${displayNumber} started: ${recentRun.html_url}`);
-                }
-                
-                if (attempts % 6 === 0) { // Log every 30 seconds
-                  console.log(`Waiting for workflow ${displayNumber} to complete... (${Math.floor(attempts * 5 / 60)}m ${(attempts * 5) % 60}s elapsed)`);
-                }
-                
-                await new Promise(resolve => setTimeout(resolve, 5000));
-                attempts++;
-              }
-              
-              // Check if workflow succeeded
-              if (!workflowRun) {
-                core.setFailed(`Workflow ${displayNumber} (${appName}) did not complete within the timeout period (15 minutes)`);
-                throw new Error(`Workflow ${displayNumber} timed out`);
-              }
-              
-              if (workflowRun.conclusion !== 'success') {
-                core.setFailed(`Workflow ${displayNumber} (${appName}) failed with conclusion: ${workflowRun.conclusion}. View run: ${workflowRun.html_url}`);
-                throw new Error(`Workflow ${displayNumber} failed, stopping execution`);
-              }
-              
-              console.log(`✓ Workflow ${displayNumber} (${appName}) succeeded`);
-              
-              if (i < appsToExport.length - 1) {
-                console.log(`Proceeding to next workflow...`);
-              }
-            }
-            
-            console.log(`\n========================================`);
-            console.log(`✓ All ${totalCount} workflow(s) completed successfully!`);
-            console.log(`========================================`);
+              # Try to push
+              if git push origin "$BRANCH_NAME"; then
+                echo "Changes pushed successfully to branch '$BRANCH_NAME'"
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "Push failed, pulling latest changes and retrying..."
+                  
+                  # Pull with rebase to get latest changes
+                  if git pull --rebase origin "$BRANCH_NAME"; then
+                    echo "Rebased successfully, waiting $RETRY_DELAY seconds before retry..."
+                    sleep $RETRY_DELAY
+                    RETRY_DELAY=$((RETRY_DELAY + 5))  # Exponential backoff
+                  else
+                    echo "Rebase failed, trying to abort and continue..."
+                    git rebase --abort || true
+                    sleep $RETRY_DELAY
+                    RETRY_DELAY=$((RETRY_DELAY + 5))
+                  fi
+                else
+                  echo "Failed to push after $MAX_RETRIES attempts"
+                  exit 1
+                fi
+              fi
+            done
+          fi
 
       - name: Create Pull Request
         uses: actions/github-script@v7
@@ -341,7 +340,7 @@ jobs:
               await github.rest.actions.createWorkflowDispatch({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                workflow_id: 'DeploySolution.yml',
+                workflow_id: 'DeploySolution2.yml',
                 ref: branchName,
                 inputs: {
                   solution: solution,
@@ -358,4 +357,3 @@ jobs:
               console.error(`Error triggering QA deployment: ${error.message}`);
               console.log('You can manually trigger deployment or close/reopen the PR to retry');
             }
-

@@ -2,33 +2,21 @@
 set -e
 
 # Script to deploy a Power Platform solution
-# Usage: ./deploy-one-solution.sh <solution_group> <app_name> <environment> <environment_url> <client_id> <client_secret> <tenant_id>
+# Usage: ./deploy-solution.sh <solution_group> <app_name> <environment>
 
 SOLUTION_GROUP=$1
 APP_NAME=$2
 ENVIRONMENT=$3
-ENVIRONMENT_URL=$4
-CLIENT_ID=$5
-CLIENT_SECRET=$6
-TENANT_ID=$7
 
-if [ -z "$SOLUTION_GROUP" ] || [ -z "$APP_NAME" ] || [ -z "$ENVIRONMENT" ] || [ -z "$ENVIRONMENT_URL" ] || [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$TENANT_ID" ]; then
+if [ -z "$SOLUTION_GROUP" ] || [ -z "$APP_NAME" ] || [ -z "$ENVIRONMENT" ]; then
   echo "Error: Missing required arguments"
-  echo "Usage: $0 <solution_group> <app_name> <environment> <environment_url> <client_id> <client_secret> <tenant_id>"
+  echo "Usage: $0 <solution_group> <app_name> <environment>"
   exit 1
 fi
 
 echo "=========================================="
 echo "Deploying Solution: $SOLUTION_GROUP -> $APP_NAME to $ENVIRONMENT"
 echo "=========================================="
-
-# Authenticate with Power Platform
-echo "Authenticating with Power Platform..."
-pac auth create \
-  --environment "$ENVIRONMENT_URL" \
-  --applicationId "$CLIENT_ID" \
-  --clientSecret "$CLIENT_SECRET" \
-  --tenant "$TENANT_ID"
 
 # Define paths
 SOLUTION_FILE="./SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
@@ -65,8 +53,6 @@ else
 fi
 
 echo "Solution import initiated successfully"
-
-pac auth clear
 
 echo "=========================================="
 echo "Deployment completed successfully!"

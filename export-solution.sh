@@ -2,32 +2,20 @@
 set -e
 
 # Script to export a Power Platform solution
-# Usage: ./export-one-solution.sh <solution_group> <app_name> <environment_url> <client_id> <client_secret> <tenant_id>
+# Usage: ./export-solution.sh <solution_group> <app_name>
 
 SOLUTION_GROUP=$1
 APP_NAME=$2
-ENVIRONMENT_URL=$3
-CLIENT_ID=$4
-CLIENT_SECRET=$5
-TENANT_ID=$6
 
-if [ -z "$SOLUTION_GROUP" ] || [ -z "$APP_NAME" ] || [ -z "$ENVIRONMENT_URL" ] || [ -z "$CLIENT_ID" ] || [ -z "$CLIENT_SECRET" ] || [ -z "$TENANT_ID" ]; then
+if [ -z "$SOLUTION_GROUP" ] || [ -z "$APP_NAME" ]; then
   echo "Error: Missing required arguments"
-  echo "Usage: $0 <solution_group> <app_name> <environment_url> <client_id> <client_secret> <tenant_id>"
+  echo "Usage: $0 <solution_group> <app_name>"
   exit 1
 fi
 
 echo "=========================================="
 echo "Exporting Solution: $SOLUTION_GROUP -> $APP_NAME"
 echo "=========================================="
-
-# Authenticate with Power Platform
-echo "Authenticating with Power Platform..."
-pac auth create \
-  --environment "$ENVIRONMENT_URL" \
-  --applicationId "$CLIENT_ID" \
-  --clientSecret "$CLIENT_SECRET" \
-  --tenant "$TENANT_ID"
 
 # Get current solution version and auto-increment
 echo "Getting current solution version..."
@@ -110,8 +98,6 @@ cat > "$METADATA_FILE" << EOF
 EOF
 
 echo "Metadata file created successfully"
-
-pac auth clear
 
 echo "=========================================="
 echo "Export completed successfully!"
