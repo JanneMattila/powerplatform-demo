@@ -1,0 +1,355 @@
+name: Export Solutions (Script-based)
+run-name: "Export ${{ inputs.solution }}${{ inputs.export_dependencies && ' with dependencies' || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      solution:
+        description: 'Solution to export'
+        required: true
+        type: choice
+        options:
+          - 'Calculator -> 1. Calculator'
+          - 'Library -> 1. LibraryTables'
+          - 'Library -> 2. LibraryApp'
+          - 'MyVacations -> 1. MyVacationsTables'
+          - 'MyVacations -> 2. MyVacationsApp'
+          - 'Garage -> 1. Garage'
+      branch_name:
+        description: 'Branch name for export (e.g., "features/app-export"). Leave empty for auto-generated name with timestamp.'
+        required: false
+        type: string
+
+      export_dependencies:
+        description: 'Export dependencies?'
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+  actions: write
+  pull-requests: write
+
+jobs:
+  OrchestrateExport:
+    environment: Development
+    runs-on: ubuntu-latest
+    name: Orchestrate Export
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5.0.0
+        with:
+          fetch-depth: 0
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1
+
+      - name: Install Power Platform Tools
+        uses: microsoft/powerplatform-actions/actions-install@v1
+        with:
+          add-tools-to-path: true
+
+      - name: Validate branch name
+        id: validate_branch
+        run: |
+          BRANCH_NAME="${{ inputs.branch_name }}"
+          
+          # If no branch name provided, auto-generate with timestamp
+          if [ -z "$BRANCH_NAME" ]; then
+            TIMESTAMP=$(date -u +"%Y%m%d-%H%M%S")
+            BRANCH_NAME="features/export-solution-${TIMESTAMP}"
+            echo "No branch name provided, auto-generated: $BRANCH_NAME"
+          fi
+          
+          # Validate branch name
+          if [ "$BRANCH_NAME" = "main" ] || [ "$BRANCH_NAME" = "master" ]; then
+            echo "Error: Cannot export to main/master branch"
+            echo "Please specify a different branch name for exports"
+            exit 1
+          fi
+          
+          echo "Branch name validation passed: $BRANCH_NAME"
+          echo "branch_name=$BRANCH_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create or switch to branch
+        run: |
+          BRANCH_NAME="${{ steps.validate_branch.outputs.branch_name }}"
+          
+          # Configure git
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # Fetch all branches
+          git fetch origin
+          
+          # Check if branch exists remotely
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch '$BRANCH_NAME' exists remotely, checking it out..."
+            git checkout "$BRANCH_NAME"
+            git pull origin "$BRANCH_NAME"
+          # Check if branch exists locally
+          elif git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+            echo "Branch '$BRANCH_NAME' exists locally, checking it out..."
+            git checkout "$BRANCH_NAME"
+          else
+            echo "Creating new branch '$BRANCH_NAME'..."
+            git checkout -b "$BRANCH_NAME"
+          fi
+          
+          echo "Current branch: $(git branch --show-current)"
+          
+          # Push the branch if it's new
+          if ! git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Pushing new branch to remote..."
+            git push -u origin "$BRANCH_NAME"
+          fi
+
+      - name: Parse solution selection
+        id: parse
+        run: |
+          SOLUTION="${{ inputs.solution }}"
+          SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
+          APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
+          # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
+          APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
+          echo "solution_group=$SOLUTION_GROUP" >> $GITHUB_OUTPUT
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "Exporting: $SOLUTION_GROUP -> $APP_NAME"
+
+      - name: Execute sequential exports using script
+        run: |
+          SOLUTION_GROUP="${{ steps.parse.outputs.solution_group }}"
+          START_APP_NAME="${{ steps.parse.outputs.app_name }}"
+          EXPORT_DEPENDENCIES="${{ inputs.export_dependencies }}"
+          
+          echo "Starting sequential export for: $SOLUTION_GROUP -> $START_APP_NAME"
+          echo "Export dependencies: $EXPORT_DEPENDENCIES"
+          
+          # Read the solution groups mapping
+          SOLUTION_GROUPS=$(cat ./SolutionGroups/solution-groups.json)
+          
+          # Get apps array for the selected solution group
+          APPS=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" '.[$sg] // empty | .[]')
+          
+          if [ -z "$APPS" ]; then
+            echo "Error: Solution group '$SOLUTION_GROUP' not found in mapping"
+            exit 1
+          fi
+          
+          # Convert to array
+          APPS_ARRAY=()
+          while IFS= read -r app; do
+            APPS_ARRAY+=("$app")
+          done <<< "$APPS"
+          
+          # Find the starting app index
+          START_INDEX=-1
+          for i in "${!APPS_ARRAY[@]}"; do
+            if [ "${APPS_ARRAY[$i]}" = "$START_APP_NAME" ]; then
+              START_INDEX=$i
+              break
+            fi
+          done
+          
+          if [ $START_INDEX -eq -1 ]; then
+            echo "Error: App '$START_APP_NAME' not found in solution group '$SOLUTION_GROUP'"
+            exit 1
+          fi
+          
+          # Determine which apps to export
+          if [ "$EXPORT_DEPENDENCIES" = "true" ]; then
+            APPS_TO_EXPORT=("${APPS_ARRAY[@]:$START_INDEX}")
+          else
+            APPS_TO_EXPORT=("$START_APP_NAME")
+          fi
+          
+          TOTAL_COUNT=${#APPS_TO_EXPORT[@]}
+          echo "Will export $TOTAL_COUNT app(s): ${APPS_TO_EXPORT[*]}"
+          
+          # Export each app sequentially
+          for i in "${!APPS_TO_EXPORT[@]}"; do
+            APP_NAME="${APPS_TO_EXPORT[$i]}"
+            DISPLAY_NUMBER=$((i + 1))
+            
+            echo ""
+            echo "========================================"
+            echo "Exporting app $DISPLAY_NUMBER of $TOTAL_COUNT"
+            echo "App: $SOLUTION_GROUP -> $APP_NAME"
+            echo "========================================"
+            
+            # Execute the export script
+            chmod +x ./export-one-solution.sh
+            ./export-one-solution.sh \
+              "$SOLUTION_GROUP" \
+              "$APP_NAME" \
+              "${{ secrets.ENVIRONMENT_URL }}" \
+              "${{ secrets.CLIENT_ID }}" \
+              "${{ secrets.CLIENT_SECRET }}" \
+              "${{ secrets.TENANT_ID }}"
+            
+            if [ $? -ne 0 ]; then
+              echo "Error: Export failed for $APP_NAME"
+              exit 1
+            fi
+            
+            echo "✓ Export $DISPLAY_NUMBER ($APP_NAME) succeeded"
+            
+            if [ $i -lt $((TOTAL_COUNT - 1)) ]; then
+              echo "Proceeding to next export..."
+            fi
+          done
+          
+          echo ""
+          echo "========================================"
+          echo "✓ All $TOTAL_COUNT export(s) completed successfully!"
+          echo "========================================"
+
+      - name: Commit changes
+        run: |
+          BRANCH_NAME="${{ steps.validate_branch.outputs.branch_name }}"
+          
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          echo "Committing changes for export of ${{ steps.parse.outputs.solution_group }} -> ${{ steps.parse.outputs.app_name }}"
+          
+          git add .
+            
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            # Commit the changes first
+            git commit -m "Export of ${{ inputs.solution }} - Updated by ${{ github.actor }}"
+            
+            # Retry logic for push conflicts
+            MAX_RETRIES=5
+            RETRY_COUNT=0
+            RETRY_DELAY=5
+            
+            while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+              echo "Attempt $((RETRY_COUNT + 1)) of $MAX_RETRIES to push changes"
+              
+              # Try to push
+              if git push origin "$BRANCH_NAME"; then
+                echo "Changes pushed successfully to branch '$BRANCH_NAME'"
+                break
+              else
+                RETRY_COUNT=$((RETRY_COUNT + 1))
+                if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+                  echo "Push failed, pulling latest changes and retrying..."
+                  
+                  # Pull with rebase to get latest changes
+                  if git pull --rebase origin "$BRANCH_NAME"; then
+                    echo "Rebased successfully, waiting $RETRY_DELAY seconds before retry..."
+                    sleep $RETRY_DELAY
+                    RETRY_DELAY=$((RETRY_DELAY + 5))  # Exponential backoff
+                  else
+                    echo "Rebase failed, trying to abort and continue..."
+                    git rebase --abort || true
+                    sleep $RETRY_DELAY
+                    RETRY_DELAY=$((RETRY_DELAY + 5))
+                  fi
+                else
+                  echo "Failed to push after $MAX_RETRIES attempts"
+                  exit 1
+                fi
+              fi
+            done
+          fi
+
+      - name: Create Pull Request
+        uses: actions/github-script@v7
+        env:
+          BRANCH_NAME: ${{ steps.validate_branch.outputs.branch_name }}
+          SOLUTION: ${{ inputs.solution }}
+          EXPORT_DEPENDENCIES: ${{ inputs.export_dependencies }}
+        with:
+          script: |
+            const branchName = process.env.BRANCH_NAME;
+            const solution = process.env.SOLUTION;
+            const triggerDependent = process.env.EXPORT_DEPENDENCIES === 'true';
+            
+            // Check if PR already exists
+            const { data: existingPRs } = await github.rest.pulls.list({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: `${context.repo.owner}:${branchName}`,
+              base: 'main',
+              state: 'open'
+            });
+            
+            if (existingPRs.length > 0) {
+              console.log(`Pull request already exists: ${existingPRs[0].html_url}`);
+              console.log(`PR #${existingPRs[0].number}: ${existingPRs[0].title}`);
+              return;
+            }
+            
+            // Create new PR
+            const title = `Export ${solution}${triggerDependent ? ' with dependencies' : ''}`;
+            const body = `## Automated Solution Export
+            
+            **Solution:** ${solution}
+            **Branch:** ${branchName}
+            **Export Type:** ${triggerDependent ? 'Sequential (with dependencies)' : 'Single solution'}
+            **Triggered by:** @${context.actor}
+            
+            This PR contains the exported Power Platform solution(s) from the Development environment.
+            
+            ### Next Steps
+            - Review the changes
+            - Automated deployment to QA has been initiated
+            - Merge to deploy to Production environment
+            `;
+            
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              head: branchName,
+              base: 'main',
+              body: body
+            });
+            
+            console.log(`\n✓ Pull request created successfully!`);
+            console.log(`PR #${pr.number}: ${pr.html_url}`);
+
+      - name: Trigger QA Deployment
+        uses: actions/github-script@v7
+        env:
+          BRANCH_NAME: ${{ steps.validate_branch.outputs.branch_name }}
+          SOLUTION: ${{ inputs.solution }}
+          EXPORT_DEPENDENCIES: ${{ inputs.export_dependencies }}
+        with:
+          script: |
+            const branchName = process.env.BRANCH_NAME;
+            const solution = process.env.SOLUTION;
+            const exportDependencies = process.env.EXPORT_DEPENDENCIES === 'true';
+            
+            console.log(`\n========================================`);
+            console.log(`Triggering QA deployment orchestrator`);
+            console.log(`Solution: ${solution}`);
+            console.log(`Deploy dependencies: ${exportDependencies}`);
+            console.log(`========================================`);
+            
+            try {
+              // Trigger the DeploySolution orchestrator workflow
+              await github.rest.actions.createWorkflowDispatch({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                workflow_id: 'DeploySolution2.yml',
+                ref: branchName,
+                inputs: {
+                  solution: solution,
+                  environment: 'QA',
+                  deploy_dependencies: String(exportDependencies)
+                }
+              });
+              
+              console.log(`\n✓ QA deployment orchestrator triggered successfully`);
+              console.log(`The orchestrator will detect all solutions and deploy them sequentially`);
+              console.log(`Check the Actions tab for deployment progress`);
+              
+            } catch (error) {
+              console.error(`Error triggering QA deployment: ${error.message}`);
+              console.log('You can manually trigger deployment or close/reopen the PR to retry');
+            }

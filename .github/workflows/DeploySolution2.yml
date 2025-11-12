@@ -1,0 +1,438 @@
+name: Deploy Solutions (Script-based)
+run-name: "Deploy ${{ inputs.solution || 'Auto-triggered' }}${{ inputs.deploy_dependencies && ' with dependencies ' || ' ' }}${{ inputs.environment || '' }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      solution:
+        description: 'Solution to deploy'
+        required: true
+        type: choice
+        options:
+          - 'Calculator -> 1. Calculator'
+          - 'Library -> 1. LibraryTables'
+          - 'Library -> 2. LibraryApp'
+          - 'MyVacations -> 1. MyVacationsTables'
+          - 'MyVacations -> 2. MyVacationsApp'
+          - 'Garage -> 1. Garage'
+      environment:
+        description: 'Target environment'
+        required: true
+        type: choice
+        options:
+          - 'QA'
+          - 'Stage'
+          - 'Production'
+      deploy_dependencies:
+        description: 'Deploy dependencies?'
+        required: false
+        default: false
+        type: boolean
+#   pull_request:
+  # push:
+  #   paths-ignore:
+  #     - '.github/workflows/**'
+  #     - 'SolutionGroups/solution-groups.json'
+  #     - 'docs/**'
+  #     - 'README.md'
+  #   branches:
+  #     - main
+
+permissions:
+  contents: read
+  actions: write
+  pull-requests: read
+
+jobs:
+  OrchestrateQADeploy:
+    if: github.event_name == 'pull_request'
+    environment: QA
+    runs-on: ubuntu-latest
+    name: Orchestrate QA Deployment
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5.0.0
+        with:
+          fetch-depth: 1
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1
+
+      - name: Install Power Platform Tools
+        uses: microsoft/powerplatform-actions/actions-install@v1
+        with:
+          add-tools-to-path: true
+
+      - name: Detect solutions from PR
+        id: detect
+        run: |
+          echo "Detecting solutions from PR changes..."
+          
+          # Get list of changed *_unmanaged.zip files in the PR
+          CHANGED_FILES=$(gh pr view ${{ github.event.pull_request.number }} --json files --jq '.files[].path' | grep '_unmanaged.zip$' || true)
+          
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No *_unmanaged.zip files found in PR changes. Assuming that this is not a solution deployment PR."
+            SOLUTIONS="[]"
+            echo "solutions=$SOLUTIONS" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+          
+          # Read solution-groups.json to get proper ordering
+          SOLUTION_GROUPS=$(cat SolutionGroups/solution-groups.json)
+          
+          # Process each file and create a map with ordering info
+          declare -A SOLUTION_MAP
+          while IFS= read -r file; do
+            # Extract solution group and app name from path
+            # Expected format: SolutionGroups/Library/LibraryTables_unmanaged.zip
+            SOLUTION_GROUP=$(echo "$file" | cut -d'/' -f2)
+            APP_NAME=$(basename "$file" _unmanaged.zip)
+            
+            # Find the index of this app in the solution group array
+            INDEX=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" '.[$sg] | to_entries[] | select(.value == $app) | .key')
+            
+            if [ -n "$INDEX" ]; then
+              # Store with key "group_index_appname" for sorting
+              KEY="${SOLUTION_GROUP}_${INDEX}_${APP_NAME}"
+              SOLUTION_MAP[$KEY]="${SOLUTION_GROUP}|${APP_NAME}|${INDEX}"
+            else
+              echo "Warning: App '$APP_NAME' not found in solution group '$SOLUTION_GROUP' in solution-groups.json"
+            fi
+          done <<< "$CHANGED_FILES"
+          
+          # Sort by solution group and index, then build JSON array in correct order
+          SOLUTIONS="[]"
+          for KEY in $(printf '%s\n' "${!SOLUTION_MAP[@]}" | sort); do
+            VALUE="${SOLUTION_MAP[$KEY]}"
+            SOLUTION_GROUP=$(echo "$VALUE" | cut -d'|' -f1)
+            APP_NAME=$(echo "$VALUE" | cut -d'|' -f2)
+            INDEX=$(echo "$VALUE" | cut -d'|' -f3)
+            
+            # Add to solutions array in order (use -c for compact output)
+            SOLUTIONS=$(echo "$SOLUTIONS" | jq -c --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" --argjson idx "$INDEX" '. += [{"solution_group": $sg, "app_name": $app, "order": $idx}]')
+          done
+          
+          echo "solutions=$SOLUTIONS" >> $GITHUB_OUTPUT
+          echo "Detected solutions in deployment order:"
+          echo "$SOLUTIONS" | jq .
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Execute deployments to QA using script
+        run: |
+          SOLUTIONS='${{ steps.detect.outputs.solutions }}'
+          
+          # Parse solutions array
+          SOLUTION_COUNT=$(echo "$SOLUTIONS" | jq '. | length')
+          
+          if [ "$SOLUTION_COUNT" -eq 0 ]; then
+            echo "No solutions to deploy"
+            exit 0
+          fi
+          
+          echo "Will deploy $SOLUTION_COUNT solution(s) to QA"
+          
+          # Deploy each solution sequentially
+          for i in $(seq 0 $((SOLUTION_COUNT - 1))); do
+            SOLUTION_GROUP=$(echo "$SOLUTIONS" | jq -r ".[$i].solution_group")
+            APP_NAME=$(echo "$SOLUTIONS" | jq -r ".[$i].app_name")
+            DISPLAY_NUMBER=$((i + 1))
+            
+            echo ""
+            echo "========================================"
+            echo "Deploying solution $DISPLAY_NUMBER of $SOLUTION_COUNT"
+            echo "Solution: $SOLUTION_GROUP -> $APP_NAME"
+            echo "Environment: QA"
+            echo "========================================"
+            
+            # Pull only needed LFS files
+            git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
+            
+            # Execute the deploy script
+            chmod +x ./deploy-one-solution.sh
+            ./deploy-one-solution.sh \
+              "$SOLUTION_GROUP" \
+              "$APP_NAME" \
+              "QA" \
+              "${{ secrets.ENVIRONMENT_URL }}" \
+              "${{ secrets.CLIENT_ID }}" \
+              "${{ secrets.CLIENT_SECRET }}" \
+              "${{ secrets.TENANT_ID }}"
+            
+            if [ $? -ne 0 ]; then
+              echo "Error: Deployment failed for $APP_NAME"
+              exit 1
+            fi
+            
+            echo "✓ Deployment $DISPLAY_NUMBER ($APP_NAME) succeeded"
+            
+            if [ $i -lt $((SOLUTION_COUNT - 1)) ]; then
+              echo "Proceeding to next deployment..."
+            fi
+          done
+          
+          echo ""
+          echo "========================================"
+          echo "✓ All $SOLUTION_COUNT deployment(s) to QA completed successfully!"
+          echo "========================================"
+
+  # OrchestrateProductionDeploy:
+  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  #   environment: Production
+  #   runs-on: ubuntu-latest
+  #   name: Orchestrate Production Deployment
+  #   steps:
+  #     - name: Check out
+  #       uses: actions/checkout@v5.0.0
+  #       with:
+  #         fetch-depth: 2
+  #       env:
+  #         GIT_LFS_SKIP_SMUDGE: 1
+
+  #     - name: Install Power Platform Tools
+  #       uses: microsoft/powerplatform-actions/actions-install@v1
+  #       with:
+  #         add-tools-to-path: true
+
+  #     - name: Detect solutions from commit
+  #       id: detect
+  #       run: |
+  #         echo "Detecting solutions from commit changes..."
+          
+  #         # Get list of changed *_unmanaged.zip files in the last commit
+  #         CHANGED_FILES=$(git diff --name-only HEAD^ HEAD | grep '_unmanaged.zip$' || true)
+          
+  #         if [ -z "$CHANGED_FILES" ]; then
+  #           echo "No *_unmanaged.zip files found in commit changes"
+  #           echo "solutions=[]" >> $GITHUB_OUTPUT
+  #           exit 0
+  #         fi
+          
+  #         echo "Changed files:"
+  #         echo "$CHANGED_FILES"
+          
+  #         # Read solution-groups.json to get proper ordering
+  #         SOLUTION_GROUPS=$(cat SolutionGroups/solution-groups.json)
+          
+  #         # Process each file and create a map with ordering info
+  #         declare -A SOLUTION_MAP
+  #         while IFS= read -r file; do
+  #           # Extract solution group and app name from path
+  #           # Expected format: SolutionGroups/Library/LibraryTables_unmanaged.zip
+  #           SOLUTION_GROUP=$(echo "$file" | cut -d'/' -f2)
+  #           APP_NAME=$(basename "$file" _unmanaged.zip)
+            
+  #           # Find the index of this app in the solution group array
+  #           INDEX=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" '.[$sg] | to_entries[] | select(.value == $app) | .key')
+            
+  #           if [ -n "$INDEX" ]; then
+  #             # Store with key "group_index_appname" for sorting
+  #             KEY="${SOLUTION_GROUP}_${INDEX}_${APP_NAME}"
+  #             SOLUTION_MAP[$KEY]="${SOLUTION_GROUP}|${APP_NAME}|${INDEX}"
+  #           else
+  #             echo "Warning: App '$APP_NAME' not found in solution group '$SOLUTION_GROUP' in solution-groups.json"
+  #           fi
+  #         done <<< "$CHANGED_FILES"
+          
+  #         # Sort by solution group and index, then build JSON array in correct order
+  #         SOLUTIONS="[]"
+  #         for KEY in $(printf '%s\n' "${!SOLUTION_MAP[@]}" | sort); do
+  #           VALUE="${SOLUTION_MAP[$KEY]}"
+  #           SOLUTION_GROUP=$(echo "$VALUE" | cut -d'|' -f1)
+  #           APP_NAME=$(echo "$VALUE" | cut -d'|' -f2)
+  #           INDEX=$(echo "$VALUE" | cut -d'|' -f3)
+            
+  #           # Add to solutions array in order (use -c for compact output)
+  #           SOLUTIONS=$(echo "$SOLUTIONS" | jq -c --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" --argjson idx "$INDEX" '. += [{"solution_group": $sg, "app_name": $app, "order": $idx}]')
+  #         done
+          
+  #         echo "solutions=$SOLUTIONS" >> $GITHUB_OUTPUT
+  #         echo "Detected solutions in deployment order:"
+  #         echo "$SOLUTIONS" | jq .
+
+  #     - name: Execute deployments to Production using script
+  #       if: steps.detect.outputs.solutions != '[]'
+  #       run: |
+  #         SOLUTIONS='${{ steps.detect.outputs.solutions }}'
+          
+  #         # Parse solutions array
+  #         SOLUTION_COUNT=$(echo "$SOLUTIONS" | jq '. | length')
+          
+  #         if [ "$SOLUTION_COUNT" -eq 0 ]; then
+  #           echo "No solutions to deploy"
+  #           exit 0
+  #         fi
+          
+  #         echo "Will deploy $SOLUTION_COUNT solution(s) to Production"
+          
+  #         # Deploy each solution sequentially
+  #         for i in $(seq 0 $((SOLUTION_COUNT - 1))); do
+  #           SOLUTION_GROUP=$(echo "$SOLUTIONS" | jq -r ".[$i].solution_group")
+  #           APP_NAME=$(echo "$SOLUTIONS" | jq -r ".[$i].app_name")
+  #           DISPLAY_NUMBER=$((i + 1))
+            
+  #           echo ""
+  #           echo "========================================"
+  #           echo "Deploying solution $DISPLAY_NUMBER of $SOLUTION_COUNT"
+  #           echo "Solution: $SOLUTION_GROUP -> $APP_NAME"
+  #           echo "Environment: Production"
+  #           echo "========================================"
+            
+  #           # Pull only needed LFS files
+  #           git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
+            
+  #           # Execute the deploy script
+  #           chmod +x ./deploy-one-solution.sh
+  #           ./deploy-one-solution.sh \
+  #             "$SOLUTION_GROUP" \
+  #             "$APP_NAME" \
+  #             "Production" \
+  #             "${{ secrets.ENVIRONMENT_URL }}" \
+  #             "${{ secrets.CLIENT_ID }}" \
+  #             "${{ secrets.CLIENT_SECRET }}" \
+  #             "${{ secrets.TENANT_ID }}"
+            
+  #           if [ $? -ne 0 ]; then
+  #             echo "Error: Deployment failed for $APP_NAME"
+  #             exit 1
+  #           fi
+            
+  #           echo "✓ Deployment $DISPLAY_NUMBER ($APP_NAME) succeeded"
+            
+  #           if [ $i -lt $((SOLUTION_COUNT - 1)) ]; then
+  #             echo "Proceeding to next deployment..."
+  #           fi
+  #         done
+          
+  #         echo ""
+  #         echo "========================================"
+  #         echo "✓ All $SOLUTION_COUNT deployment(s) to Production completed successfully!"
+  #         echo "========================================"
+
+  OrchestrateManualDeploy:
+    if: github.event_name == 'workflow_dispatch' && (inputs.environment != 'Production' || github.ref == 'refs/heads/main')
+    environment: ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    name: Orchestrate ${{ inputs.environment || '' }} Deployment
+    steps:
+      - name: Check out
+        uses: actions/checkout@v5.0.0
+        with:
+          fetch-depth: 1
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1
+
+      - name: Install Power Platform Tools
+        uses: microsoft/powerplatform-actions/actions-install@v1
+        with:
+          add-tools-to-path: true
+
+      - name: Parse solution selection
+        id: parse
+        run: |
+          SOLUTION="${{ inputs.solution }}"
+          SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
+          APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
+          # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
+          APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
+          echo "solution_group=$SOLUTION_GROUP" >> $GITHUB_OUTPUT
+          echo "app_name=$APP_NAME" >> $GITHUB_OUTPUT
+          echo "Deploying: $SOLUTION_GROUP -> $APP_NAME to ${{ inputs.environment }}"
+
+      - name: Execute deployments using script
+        run: |
+          SOLUTION_GROUP="${{ steps.parse.outputs.solution_group }}"
+          START_APP_NAME="${{ steps.parse.outputs.app_name }}"
+          ENVIRONMENT="${{ inputs.environment }}"
+          DEPLOY_DEPENDENCIES="${{ inputs.deploy_dependencies }}"
+          
+          echo "Starting sequential deployment for: $SOLUTION_GROUP -> $START_APP_NAME"
+          echo "Target environment: $ENVIRONMENT"
+          echo "Deploy dependencies: $DEPLOY_DEPENDENCIES"
+          
+          # Read the solution groups mapping
+          SOLUTION_GROUPS=$(cat ./SolutionGroups/solution-groups.json)
+          
+          # Get apps array for the selected solution group
+          APPS=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" '.[$sg] // empty | .[]')
+          
+          if [ -z "$APPS" ]; then
+            echo "Error: Solution group '$SOLUTION_GROUP' not found in mapping"
+            exit 1
+          fi
+          
+          # Convert to array
+          APPS_ARRAY=()
+          while IFS= read -r app; do
+            APPS_ARRAY+=("$app")
+          done <<< "$APPS"
+          
+          # Find the starting app index
+          START_INDEX=-1
+          for i in "${!APPS_ARRAY[@]}"; do
+            if [ "${APPS_ARRAY[$i]}" = "$START_APP_NAME" ]; then
+              START_INDEX=$i
+              break
+            fi
+          done
+          
+          if [ $START_INDEX -eq -1 ]; then
+            echo "Error: App '$START_APP_NAME' not found in solution group '$SOLUTION_GROUP'"
+            exit 1
+          fi
+          
+          # Determine which apps to deploy
+          if [ "$DEPLOY_DEPENDENCIES" = "true" ]; then
+            APPS_TO_DEPLOY=("${APPS_ARRAY[@]:$START_INDEX}")
+          else
+            APPS_TO_DEPLOY=("$START_APP_NAME")
+          fi
+          
+          TOTAL_COUNT=${#APPS_TO_DEPLOY[@]}
+          echo "Will deploy $TOTAL_COUNT app(s): ${APPS_TO_DEPLOY[*]}"
+          
+          # Deploy each app sequentially
+          for i in "${!APPS_TO_DEPLOY[@]}"; do
+            APP_NAME="${APPS_TO_DEPLOY[$i]}"
+            DISPLAY_NUMBER=$((i + 1))
+            
+            echo ""
+            echo "========================================"
+            echo "Deploying app $DISPLAY_NUMBER of $TOTAL_COUNT"
+            echo "App: $SOLUTION_GROUP -> $APP_NAME"
+            echo "Environment: $ENVIRONMENT"
+            echo "========================================"
+            
+            # Pull only needed LFS files
+            git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
+            
+            # Execute the deploy script
+            chmod +x ./deploy-one-solution.sh
+            ./deploy-one-solution.sh \
+              "$SOLUTION_GROUP" \
+              "$APP_NAME" \
+              "$ENVIRONMENT" \
+              "${{ secrets.ENVIRONMENT_URL }}" \
+              "${{ secrets.CLIENT_ID }}" \
+              "${{ secrets.CLIENT_SECRET }}" \
+              "${{ secrets.TENANT_ID }}"
+            
+            if [ $? -ne 0 ]; then
+              echo "Error: Deployment failed for $APP_NAME"
+              exit 1
+            fi
+            
+            echo "✓ Deployment $DISPLAY_NUMBER ($APP_NAME) succeeded"
+            
+            if [ $i -lt $((TOTAL_COUNT - 1)) ]; then
+              echo "Proceeding to next deployment..."
+            fi
+          done
+          
+          echo ""
+          echo "========================================"
+          echo "✓ All $TOTAL_COUNT deployment(s) completed successfully!"
+          echo "========================================"
