@@ -293,9 +293,9 @@ jobs:
                 const metadata = fs.readFileSync(metadataFile, 'utf8');
                 const versionMatch = metadata.match(/\*\*Version:\*\*\s+([^\n]+)/);
                 const version = versionMatch ? versionMatch[1].trim() : 'unknown';
-                solutionList += `- ${appName}: ${version}\n            `;
+                solutionList += `- ${appName}: ${version}\n`;
               } catch (error) {
-                solutionList += `- ${appName}: version unavailable\n            `;
+                solutionList += `- ${appName}: version unavailable\n`;
               }
             }
             
