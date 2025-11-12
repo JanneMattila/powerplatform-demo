@@ -66,6 +66,8 @@ fi
 
 echo "Solution import initiated successfully"
 
+pac auth clear
+
 echo "=========================================="
 echo "Deployment completed successfully!"
 echo "Solution: $APP_NAME"

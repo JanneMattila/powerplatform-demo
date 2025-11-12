@@ -111,6 +111,8 @@ EOF
 
 echo "Metadata file created successfully"
 
+pac auth clear
+
 echo "=========================================="
 echo "Export completed successfully!"
 echo "Version: $NEW_VERSION"
