@@ -232,8 +232,8 @@ Add the new solution group to `SolutionGroups/solution-groups.json`:
 Update **both** workflow files to include the new solution group options:
 
 **Files to update:**
-- `.github/workflows/DeploySolution.yml`
-- `.github/workflows/ExportSolution.yml`
+- `.github/workflows/DeploySolutions.yml`
+- `.github/workflows/ExportSolutions.yml`
 
 **Add these lines to the `options` section under `inputs.solution`:**
 

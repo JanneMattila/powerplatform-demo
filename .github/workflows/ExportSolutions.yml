@@ -185,6 +185,7 @@ jobs:
             echo "========================================"
             
             # Execute the export script
+            chmod +x ./export-solution.sh
             ./export-solution.sh \
               "$SOLUTION_GROUP" \
               "$APP_NAME"

@@ -161,6 +161,7 @@ jobs:
             git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
             
             # Execute the deploy script
+            chmod +x ./deploy-solution.sh
             ./deploy-solution.sh \
               "$SOLUTION_GROUP" \
               "$APP_NAME" \
@@ -292,6 +293,7 @@ jobs:
             git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
             
             # Execute the deploy script
+            chmod +x ./deploy-solution.sh
             ./deploy-solution.sh \
               "$SOLUTION_GROUP" \
               "$APP_NAME" \
