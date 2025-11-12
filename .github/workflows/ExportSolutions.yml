@@ -167,10 +167,10 @@ jobs:
           # Authenticate with Power Platform
           echo "Authenticating with Power Platform..."
           pac auth create \
-          --environment "$ENVIRONMENT_URL" \
-          --applicationId "$CLIENT_ID" \
-          --clientSecret "$CLIENT_SECRET" \
-          --tenant "$TENANT_ID" \
+          --environment "${{ secrets.ENVIRONMENT_URL }}" \
+          --applicationId "${{ secrets.CLIENT_ID }}" \
+          --clientSecret "${{ secrets.CLIENT_SECRET }}" \
+          --tenant "${{ secrets.TENANT_ID }}" \
           --accept-cleartext-caching
 
           # Export each app sequentially

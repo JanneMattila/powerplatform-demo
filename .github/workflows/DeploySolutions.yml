@@ -138,11 +138,11 @@ jobs:
           # Authenticate with Power Platform
           echo "Authenticating with Power Platform..."
           pac auth create \
-          --environment "$ENVIRONMENT_URL" \
-          --applicationId "$CLIENT_ID" \
-          --clientSecret "$CLIENT_SECRET" \
-          --tenant "$TENANT_ID" \
-          --accept-cleartext-caching     
+          --environment "${{ secrets.ENVIRONMENT_URL }}" \
+          --applicationId "${{ secrets.CLIENT_ID }}" \
+          --clientSecret "${{ secrets.CLIENT_SECRET }}" \
+          --tenant "${{ secrets.TENANT_ID }}" \
+          --accept-cleartext-caching
           
           # Deploy each solution sequentially
           for i in $(seq 0 $((SOLUTION_COUNT - 1))); do
@@ -266,7 +266,16 @@ jobs:
           
           TOTAL_COUNT=${#APPS_TO_DEPLOY[@]}
           echo "Will deploy $TOTAL_COUNT app(s): ${APPS_TO_DEPLOY[*]}"
-          
+
+          # Authenticate with Power Platform
+          echo "Authenticating with Power Platform..."
+          pac auth create \
+          --environment "${{ secrets.ENVIRONMENT_URL }}" \
+          --applicationId "${{ secrets.CLIENT_ID }}" \
+          --clientSecret "${{ secrets.CLIENT_SECRET }}" \
+          --tenant "${{ secrets.TENANT_ID }}" \
+          --accept-cleartext-caching
+
           # Deploy each app sequentially
           for i in "${!APPS_TO_DEPLOY[@]}"; do
             APP_NAME="${APPS_TO_DEPLOY[$i]}"
