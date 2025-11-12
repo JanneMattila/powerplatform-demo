@@ -22,14 +22,10 @@ gitGraph:
 
 Two GitHub Actions workflows manage the Solution Groups:
 
-1. **Deploy Solutions (Orchestrator)** (`DeploySolution.yml`) - Orchestrates sequential deployment of solutions to QA or Production environments
-2. **Export Solutions (Orchestrator)** (`ExportSolution.yml`) - Orchestrates sequential export of solutions from Development environment
+1. **Deploy Solutions** (`DeploySolutions.yml`) - Deploys solutions
+2. **Export Solutions** (`ExportSolutions.yml`) - Exports solutions from Development environment
 
 Both workflows support **dependency/sequential processing**, allowing automatic export or deployment of dependent solutions in the correct order.
-
-Implementation uses
-[Power Platform Actions](https://github.com/microsoft/powerplatform-actions/)
-for automations.
 
 ## Directory Structure
 
@@ -88,9 +84,9 @@ This means:
 
 ## Workflows
 
-### 1. Deploy Solution Workflow
+### 1. Deploy Solutions Workflow
 
-**File:** `.github/workflows/DeploySolution.yml`
+**File:** `.github/workflows/DeploySolutions.yml`
 
 **Purpose:** Deploy applications and display their configuration
 
@@ -106,7 +102,7 @@ This means:
 - Uses the branch/tag selected in GitHub Actions UI
 
 **Manual Usage:**
-1. Go to Actions → "Deploy Solutions (Orchestrator)"
+1. Go to Actions → "Deploy Solutions"
 2. Click "Run workflow"
 3. Select the solution to deploy (e.g., "Library -> 1. LibraryTables")
 4. Select the target environment (QA or Production)
@@ -146,9 +142,9 @@ Initiate deployment of LibraryTables which has the following configuration:
 
 When "Trigger dependent workflows" is enabled, it will deploy LibraryTables first, then automatically trigger LibraryApp.
 
-### 2. Export Solution Workflow
+### 2. Export Solutions Workflow
 
-**File:** `.github/workflows/ExportSolution.yml`
+**File:** `.github/workflows/ExportSolutions.yml`
 
 **Purpose:** Update application metadata and commit changes
 
@@ -163,7 +159,7 @@ When "Trigger dependent workflows" is enabled, it will deploy LibraryTables firs
 - Creates an audit trail of export activities
 
 **Usage:**
-1. Go to Actions → "Export Solutions (Orchestrator)"
+1. Go to Actions → "Export Solutions"
 2. Click "Run workflow"
 3. Select the solution to export (e.g., "Library -> 1. LibraryTables")
 4. Enter a branch name (optional)
@@ -269,7 +265,7 @@ Before running the export workflow, ensure the solutions exist in your Power Pla
 
 ### Step 5: Run Export Workflow
 
-1. Go to GitHub Actions → "Export Solutions (Orchestrator)"
+1. Go to GitHub Actions → "Export Solutions"
 2. Select: "Benefits -> 1. BenefitsTables"
 3. Branch name: features/benefits-initial-export
 4. Check "Export dependencies?" to also export BenefitsApp
@@ -355,7 +351,7 @@ Ensure the "LibraryReports" solution exists in your Power Platform Development e
 
 ### Step 4: Run Export Workflow
 
-1. Go to GitHub Actions → "Export Solutions (Orchestrator)"
+1. Go to GitHub Actions → "Export Solutions"
 2. Select: "Library -> 3. LibraryReports"
 3. Branch name: features/add-library-reports
 4. Click "Run workflow"
