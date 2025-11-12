@@ -268,11 +268,36 @@ jobs:
           BRANCH_NAME: ${{ steps.validate_branch.outputs.branch_name }}
           SOLUTION: ${{ inputs.solution }}
           EXPORT_DEPENDENCIES: ${{ inputs.export_dependencies }}
+          SOLUTION_GROUP: ${{ steps.parse.outputs.solution_group }}
+          APP_NAME: ${{ steps.parse.outputs.app_name }}
         with:
           script: |
+            const fs = require('fs');
             const branchName = process.env.BRANCH_NAME;
             const solution = process.env.SOLUTION;
             const triggerDependent = process.env.EXPORT_DEPENDENCIES === 'true';
+            const solutionGroup = process.env.SOLUTION_GROUP;
+            const startAppName = process.env.APP_NAME;
+            
+            // Read the solution groups mapping to determine which apps were exported
+            const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
+            const apps = solutionGroups[solutionGroup];
+            const startIndex = apps.indexOf(startAppName);
+            const appsExported = triggerDependent ? apps.slice(startIndex) : [startAppName];
+            
+            // Build the solution list with versions from metadata files
+            let solutionList = '';
+            for (const appName of appsExported) {
+              const metadataFile = `./SolutionGroups/${solutionGroup}/${appName}.md`;
+              try {
+                const metadata = fs.readFileSync(metadataFile, 'utf8');
+                const versionMatch = metadata.match(/\*\*Version:\*\*\s+([^\n]+)/);
+                const version = versionMatch ? versionMatch[1].trim() : 'unknown';
+                solutionList += `- ${appName}: ${version}\n            `;
+              } catch (error) {
+                solutionList += `- ${appName}: version unavailable\n            `;
+              }
+            }
             
             // Check if PR already exists
             const { data: existingPRs } = await github.rest.pulls.list({
@@ -298,7 +323,9 @@ jobs:
             **Export Type:** ${triggerDependent ? 'Sequential (with dependencies)' : 'Single solution'}
             **Triggered by:** @${context.actor}
             
-            This PR contains the exported Power Platform solution(s) from the Development environment.
+            This PR contains the exported Power Platform solution(s) from the Development environment:
+
+            ${solutionList}
             
             ### Next Steps
             - Review the changes
@@ -341,7 +368,7 @@ jobs:
               await github.rest.actions.createWorkflowDispatch({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
-                workflow_id: 'DeploySolution2.yml',
+                workflow_id: 'DeploySolutions.yml',
                 ref: branchName,
                 inputs: {
                   solution: solution,
