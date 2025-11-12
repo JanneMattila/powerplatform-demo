@@ -1,4 +1,4 @@
-name: Deploy Solutions (Script-based)
+name: Deploy Solutions
 run-name: "Deploy ${{ inputs.solution || 'Auto-triggered' }}${{ inputs.deploy_dependencies && ' with dependencies ' || ' ' }}${{ inputs.environment || '' }}"
 
 on:

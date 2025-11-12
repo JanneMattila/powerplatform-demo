@@ -1,4 +1,4 @@
-name: Export Solutions (Script-based)
+name: Export Solutions
 run-name: "Export ${{ inputs.solution }}${{ inputs.export_dependencies && ' with dependencies' || '' }}"
 
 on:
