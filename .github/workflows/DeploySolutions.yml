@@ -17,6 +17,7 @@ on:
           - 'Garage -> 1. Garage'
           - 'Demo -> 1. Demo1'
           - 'Demo -> 2. Demo2'
+          - 'App -> 1. App1'
       environment:
         description: 'Target environment'
         required: true
