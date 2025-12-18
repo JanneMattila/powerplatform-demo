@@ -17,6 +17,7 @@ on:
           - 'Garage -> 1. Garage'
           - 'Demo -> 1. Demo1'
           - 'Demo -> 2. Demo2'
+          - 'App -> 1. App1'
       branch_name:
         description: 'Branch name for export (e.g., "features/app-export"). Leave empty for auto-generated name with timestamp.'
         required: false

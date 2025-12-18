@@ -16,5 +16,8 @@
     "Demo": [
         "Demo1",
         "Demo2"
+    ],
+    "App": [
+        "App1"
     ]
 }
