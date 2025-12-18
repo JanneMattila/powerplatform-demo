@@ -18,6 +18,7 @@ on:
           - 'Demo -> 1. Demo1'
           - 'Demo -> 2. Demo2'
           - 'App -> 1. App1'
+          - 'MyTeams -> 1. MyTeams'
       environment:
         description: 'Target environment'
         required: true
