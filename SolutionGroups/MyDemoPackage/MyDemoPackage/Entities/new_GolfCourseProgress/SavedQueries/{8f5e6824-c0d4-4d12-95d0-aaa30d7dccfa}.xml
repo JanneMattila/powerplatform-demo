@@ -1,0 +1,44 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<savedqueries xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <savedquery>
+    <IsCustomizable>1</IsCustomizable>
+    <CanBeDeleted>0</CanBeDeleted>
+    <isquickfindquery>0</isquickfindquery>
+    <isprivate>0</isprivate>
+    <isdefault>1</isdefault>
+    <savedqueryid>{8f5e6824-c0d4-4d12-95d0-aaa30d7dccfa}</savedqueryid>
+    <layoutxml>
+      <grid name="resultset" jump="new_coursename" select="1" icon="1" preview="1">
+        <row name="result" id="new_golfcourseprogressid">
+          <cell name="new_coursename" width="300" />
+          <cell name="new_dateplayed" width="150" />
+          <cell name="new_score" width="150" />
+          <cell name="new_completed" width="150" />
+          <cell name="new_playerid" width="150" />
+        </row>
+      </grid>
+    </layoutxml>
+    <querytype>0</querytype>
+    <fetchxml>
+      <fetch version="1.0" mapping="logical">
+        <entity name="new_golfcourseprogress">
+          <attribute name="new_golfcourseprogressid" />
+          <attribute name="new_coursename" />
+          <attribute name="createdon" />
+          <order attribute="new_coursename" descending="false" />
+          <filter type="and">
+            <condition attribute="statecode" operator="eq" value="0" />
+          </filter>
+          <attribute name="new_dateplayed" />
+          <attribute name="new_score" />
+          <attribute name="new_completed" />
+          <attribute name="new_playerid" />
+        </entity>
+      </fetch>
+    </fetchxml>
+    <IntroducedVersion>1.0</IntroducedVersion>
+    <LocalizedNames>
+      <LocalizedName description="Active Golf Course Progresses" languagecode="1033" />
+    </LocalizedNames>
+  </savedquery>
+</savedqueries>
