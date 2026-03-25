@@ -21,7 +21,7 @@ echo "=========================================="
 # Define paths
 SOLUTION_DIR="./SolutionGroups/$SOLUTION_GROUP"
 SOLUTION_FILE="$SOLUTION_DIR/${APP_NAME}.zip"
-SOURCE_DIR="$SOLUTION_DIR/${APP_NAME}_unmanaged"
+SOURCE_DIR="$SOLUTION_DIR/${APP_NAME}"
 DEPLOYMENT_SETTINGS_FILE="$SOLUTION_DIR/${APP_NAME}.${ENVIRONMENT}.json"
 
 if [ "$ENVIRONMENT" = "Development" ]; then

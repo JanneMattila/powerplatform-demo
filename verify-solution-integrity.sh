@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Script to verify that the _unmanaged.zip matches the _unmanaged/ source folder.
+# Script to verify that the _unmanaged.zip matches the source folder.
 # This ensures developers haven't edited source files without re-exporting the zip.
 # Usage: ./verify-solution-integrity.sh <solution_group> <app_name>
 
@@ -19,7 +19,7 @@ echo "Verifying Solution Integrity: $SOLUTION_GROUP -> $APP_NAME"
 echo "=========================================="
 
 # Define paths
-SOURCE_DIR="./SolutionGroups/$SOLUTION_GROUP/${APP_NAME}_unmanaged"
+SOURCE_DIR="./SolutionGroups/$SOLUTION_GROUP/${APP_NAME}"
 ZIP_FILE="./SolutionGroups/$SOLUTION_GROUP/${APP_NAME}_unmanaged.zip"
 
 # Check if source folder exists
