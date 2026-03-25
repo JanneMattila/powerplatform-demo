@@ -28,6 +28,11 @@ on:
         required: false
         default: false
         type: boolean
+      create_pull_request:
+        description: 'Create pull request?'
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -130,7 +135,7 @@ jobs:
           SOLUTION_GROUPS=$(cat ./SolutionGroups/solution-groups.json)
           
           # Get apps array for the selected solution group
-          APPS=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" '.[$sg] // empty | .[]')
+          APPS=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" '.[$sg].Solutions // empty | .[]')
           
           if [ -z "$APPS" ]; then
             echo "Error: Solution group '$SOLUTION_GROUP' not found in mapping"
@@ -266,6 +271,7 @@ jobs:
           fi
 
       - name: Create Pull Request
+        if: inputs.create_pull_request != false
         uses: actions/github-script@v7
         env:
           BRANCH_NAME: ${{ steps.validate_branch.outputs.branch_name }}
@@ -284,7 +290,7 @@ jobs:
             
             // Read the solution groups mapping to determine which apps were exported
             const solutionGroups = JSON.parse(fs.readFileSync('./SolutionGroups/solution-groups.json', 'utf8'));
-            const apps = solutionGroups[solutionGroup];
+            const apps = solutionGroups[solutionGroup].Solutions;
             const startIndex = apps.indexOf(startAppName);
             const appsExported = triggerDependent ? apps.slice(startIndex) : [startAppName];
             
@@ -349,6 +355,7 @@ jobs:
             console.log(`PR #${pr.number}: ${pr.html_url}`);
 
       - name: Trigger QA Deployment
+        if: inputs.create_pull_request != false
         uses: actions/github-script@v7
         env:
           BRANCH_NAME: ${{ steps.validate_branch.outputs.branch_name }}

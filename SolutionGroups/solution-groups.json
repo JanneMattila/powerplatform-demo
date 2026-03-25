@@ -1,23 +1,41 @@
 {
-    "Calculator": [
-        "Calculator"
-    ],
-    "Library": [
-        "LibraryTables",
-        "LibraryApp"
-    ],
-    "MyVacations": [
-        "MyVacationsTables",
-        "MyVacationsApp"
-    ],
-    "Garage": [
-        "Garage"
-    ],
-    "Demo": [
-        "Demo1",
-        "Demo2"
-    ],
-    "App": [
-        "App1"
-    ]
+    "Calculator": {
+        "Configurations": {},
+        "Solutions": [
+            "Calculator"
+        ]
+    },
+    "Library": {
+        "Configurations": {},
+        "Solutions": [
+            "LibraryTables",
+            "LibraryApp"
+        ]
+    },
+    "MyVacations": {
+        "Configurations": {},
+        "Solutions": [
+            "MyVacationsTables",
+            "MyVacationsApp"
+        ]
+    },
+    "Garage": {
+        "Configurations": {},
+        "Solutions": [
+            "Garage"
+        ]
+    },
+    "Demo": {
+        "Configurations": {},
+        "Solutions": [
+            "Demo1",
+            "Demo2"
+        ]
+    },
+    "App": {
+        "Configurations": {},
+        "Solutions": [
+            "App1"
+        ]
+    }
 }

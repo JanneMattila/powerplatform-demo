@@ -55,3 +55,27 @@ GitHub environments configured with the necessary secrets:
 | TENANT_ID       | Directory (tenant) ID of the service principal   | 6f6b9051-7e7c-4b41-bc5e-bf027ce1951f |
 | CLIENT_SECRET   | Client secret of the service principal           | `auto-generated-password`            |
 | ENVIRONMENT_URL | URL of the target Power Platform environment     | https://org2f3b2369.crm.dynamics.com |
+
+## Environment URL Overrides
+
+The `ENVIRONMENT_URL` secret is the default target for all deployments. You can override it per solution group and per environment using the `Configurations` section in `SolutionGroups/solution-groups.json`.
+
+Example — deploy the `Library` group to a different QA environment:
+
+```json
+{
+    "Library": {
+        "Configurations": {
+            "QA": {
+                "Environment": "https://org123456.crm.dynamics.com/"
+            }
+        },
+        "Solutions": [
+            "LibraryTables",
+            "LibraryApp"
+        ]
+    }
+}
+```
+
+When a `Configurations.<environment>.Environment` value is present, the deployment workflow uses it instead of `secrets.ENVIRONMENT_URL`. If no override is defined, the secret is used as before.

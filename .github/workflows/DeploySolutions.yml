@@ -95,7 +95,7 @@ jobs:
             APP_NAME=$(basename "$file" _unmanaged.zip)
             
             # Find the index of this app in the solution group array
-            INDEX=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" '.[$sg] | to_entries[] | select(.value == $app) | .key')
+            INDEX=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" '.[$sg].Solutions | to_entries[] | select(.value == $app) | .key')
             
             if [ -n "$INDEX" ]; then
               # Store with key "group_index_appname" for sorting
@@ -138,51 +138,62 @@ jobs:
           
           echo "Will deploy $SOLUTION_COUNT solution(s) to QA"
 
-          # Authenticate with Power Platform
-          echo "Authenticating with Power Platform..."
-          pac auth create \
-          --environment "${{ secrets.ENVIRONMENT_URL }}" \
-          --applicationId "${{ secrets.CLIENT_ID }}" \
-          --clientSecret "${{ secrets.CLIENT_SECRET }}" \
-          --tenant "${{ secrets.TENANT_ID }}" \
-          --accept-cleartext-caching
-          
-          # Deploy each solution sequentially
-          for i in $(seq 0 $((SOLUTION_COUNT - 1))); do
-            SOLUTION_GROUP=$(echo "$SOLUTIONS" | jq -r ".[$i].solution_group")
-            APP_NAME=$(echo "$SOLUTIONS" | jq -r ".[$i].app_name")
-            DISPLAY_NUMBER=$((i + 1))
-            
-            echo ""
-            echo "========================================"
-            echo "Deploying solution $DISPLAY_NUMBER of $SOLUTION_COUNT"
-            echo "Solution: $SOLUTION_GROUP -> $APP_NAME"
-            echo "Environment: QA"
-            echo "========================================"
-            
-            # Pull only needed LFS files
-            git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
-            
-            # Execute the deploy script
-            chmod +x ./deploy-solution.sh
-            ./deploy-solution.sh \
-              "$SOLUTION_GROUP" \
-              "$APP_NAME" \
-              "QA"
-            
-            if [ $? -ne 0 ]; then
-              echo "Error: Deployment failed for $APP_NAME"
-              exit 1
-            fi
-            
-            echo "✓ Deployment $DISPLAY_NUMBER ($APP_NAME) succeeded"
-            
-            if [ $i -lt $((SOLUTION_COUNT - 1)) ]; then
-              echo "Proceeding to next deployment..."
-            fi
-          done
+          # Read solution-groups.json for environment URL overrides
+          SOLUTION_GROUPS_JSON=$(cat SolutionGroups/solution-groups.json)
 
-          pac auth clear
+          # Get unique solution groups in order
+          UNIQUE_GROUPS=$(echo "$SOLUTIONS" | jq -r '[.[].solution_group] | unique | .[]')
+          DEPLOYED_COUNT=0
+
+          for SOLUTION_GROUP in $UNIQUE_GROUPS; do
+            # Resolve environment URL for this solution group
+            CONFIG_ENV_URL=$(echo "$SOLUTION_GROUPS_JSON" | jq -r --arg sg "$SOLUTION_GROUP" '.[$sg].Configurations.QA.Environment // empty')
+            TARGET_ENV_URL="${CONFIG_ENV_URL:-${{ secrets.ENVIRONMENT_URL }}}"
+
+            # Authenticate with Power Platform for this solution group
+            echo "Authenticating with Power Platform ($TARGET_ENV_URL)..."
+            pac auth create \
+            --environment "$TARGET_ENV_URL" \
+            --applicationId "${{ secrets.CLIENT_ID }}" \
+            --clientSecret "${{ secrets.CLIENT_SECRET }}" \
+            --tenant "${{ secrets.TENANT_ID }}" \
+            --accept-cleartext-caching
+
+            # Get solutions for this group in order
+            GROUP_SOLUTIONS=$(echo "$SOLUTIONS" | jq -c --arg sg "$SOLUTION_GROUP" '[.[] | select(.solution_group == $sg)]')
+            GROUP_COUNT=$(echo "$GROUP_SOLUTIONS" | jq '. | length')
+
+            for j in $(seq 0 $((GROUP_COUNT - 1))); do
+              APP_NAME=$(echo "$GROUP_SOLUTIONS" | jq -r ".[$j].app_name")
+              DEPLOYED_COUNT=$((DEPLOYED_COUNT + 1))
+              
+              echo ""
+              echo "========================================"
+              echo "Deploying solution $DEPLOYED_COUNT of $SOLUTION_COUNT"
+              echo "Solution: $SOLUTION_GROUP -> $APP_NAME"
+              echo "Environment: QA"
+              echo "========================================"
+              
+              # Pull only needed LFS files
+              git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
+              
+              # Execute the deploy script
+              chmod +x ./deploy-solution.sh
+              ./deploy-solution.sh \
+                "$SOLUTION_GROUP" \
+                "$APP_NAME" \
+                "QA"
+              
+              if [ $? -ne 0 ]; then
+                echo "Error: Deployment failed for $APP_NAME"
+                exit 1
+              fi
+              
+              echo "✓ Deployment $DEPLOYED_COUNT ($APP_NAME) succeeded"
+            done
+
+            pac auth clear
+          done
           
           echo ""
           echo "========================================"
@@ -234,7 +245,7 @@ jobs:
           SOLUTION_GROUPS=$(cat ./SolutionGroups/solution-groups.json)
           
           # Get apps array for the selected solution group
-          APPS=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" '.[$sg] // empty | .[]')
+          APPS=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" '.[$sg].Solutions // empty | .[]')
           
           if [ -z "$APPS" ]; then
             echo "Error: Solution group '$SOLUTION_GROUP' not found in mapping"
@@ -271,10 +282,14 @@ jobs:
           TOTAL_COUNT=${#APPS_TO_DEPLOY[@]}
           echo "Will deploy $TOTAL_COUNT app(s): ${APPS_TO_DEPLOY[*]}"
 
+          # Resolve environment URL: check Configurations for environment override, fall back to secret
+          CONFIG_ENV_URL=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" --arg env "$ENVIRONMENT" '.[$sg].Configurations[$env].Environment // empty')
+          TARGET_ENV_URL="${CONFIG_ENV_URL:-${{ secrets.ENVIRONMENT_URL }}}"
+
           # Authenticate with Power Platform
-          echo "Authenticating with Power Platform..."
+          echo "Authenticating with Power Platform ($TARGET_ENV_URL)..."
           pac auth create \
-          --environment "${{ secrets.ENVIRONMENT_URL }}" \
+          --environment "$TARGET_ENV_URL" \
           --applicationId "${{ secrets.CLIENT_ID }}" \
           --clientSecret "${{ secrets.CLIENT_SECRET }}" \
           --tenant "${{ secrets.TENANT_ID }}" \

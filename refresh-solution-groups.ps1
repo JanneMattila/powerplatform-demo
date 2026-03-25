@@ -22,10 +22,10 @@ param(
     [string]$SolutionGroupsFile = ".\SolutionGroups\solution-groups.json",
     
     [Parameter(Mandatory = $false)]
-    [string]$ExportWorkflowFile = ".\.github\workflows\ExportSolution.yml",
+    [string]$ExportWorkflowFile = ".\.github\workflows\ExportSolutions.yml",
     
     [Parameter(Mandatory = $false)]
-    [string]$DeployWorkflowFile = ".\.github\workflows\DeploySolution.yml"
+    [string]$DeployWorkflowFile = ".\.github\workflows\DeploySolutions.yml"
 )
 
 Set-StrictMode -Version Latest
@@ -60,7 +60,7 @@ $solutionGroups = Get-Content $SolutionGroupsFile -Raw | ConvertFrom-Json
 $options = @()
 foreach ($groupProperty in $solutionGroups.PSObject.Properties) {
     $groupName = $groupProperty.Name
-    $apps = $groupProperty.Value
+    $apps = $groupProperty.Value.Solutions
     
     Write-Host "  Processing group: $groupName" -ForegroundColor Yellow
     
