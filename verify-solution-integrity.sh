@@ -64,7 +64,7 @@ if [ -n "$DIFF_OUTPUT" ]; then
   echo "INTEGRITY CHECK FAILED"
   echo "=========================================="
   echo ""
-  echo "The _unmanaged.zip does not match the _unmanaged/ source folder."
+  echo "The _unmanaged.zip does not match the source folder."
   echo "This means source files have been edited without re-exporting,"
   echo "or the zip was updated without unpacking."
   echo ""
