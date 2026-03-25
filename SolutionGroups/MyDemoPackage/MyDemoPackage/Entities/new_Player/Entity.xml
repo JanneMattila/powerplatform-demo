@@ -10,7 +10,7 @@
         <LocalizedCollectionName description="Players" languagecode="1033" />
       </LocalizedCollectionNames>
       <Descriptions>
-        <Description description="This table contains records of golf players" languagecode="1033" />
+        <Description description="This table contains records of golf players stats" languagecode="1033" />
       </Descriptions>
       <attributes>
         <attribute PhysicalName="CreatedBy">
