@@ -188,7 +188,8 @@ jobs:
             chmod +x ./export-solution.sh
             ./export-solution.sh \
               "$SOLUTION_GROUP" \
-              "$APP_NAME"
+              "$APP_NAME" \
+              "${{ inputs.create_pull_request }}"
             
             if [ $? -ne 0 ]; then
               echo "Error: Export failed for $APP_NAME"

@@ -2,14 +2,16 @@
 set -e
 
 # Script to export a Power Platform solution
-# Usage: ./export-solution.sh <solution_group> <app_name>
+# Usage: ./export-solution.sh <solution_group> <app_name> [increment_version]
+#   increment_version: "true" (default) or "false" to skip version increment
 
 SOLUTION_GROUP=$1
 APP_NAME=$2
+INCREMENT_VERSION=${3:-true}
 
 if [ -z "$SOLUTION_GROUP" ] || [ -z "$APP_NAME" ]; then
   echo "Error: Missing required arguments"
-  echo "Usage: $0 <solution_group> <app_name>"
+  echo "Usage: $0 <solution_group> <app_name> [increment_version]"
   exit 1
 fi
 
@@ -41,15 +43,20 @@ MINOR=${MINOR:-0}
 BUILD=${BUILD:-0}
 REVISION=${REVISION:-0}
 
-# Increment revision number
-NEW_REVISION=$((REVISION + 1))
-NEW_VERSION="$MAJOR.$MINOR.$BUILD.$NEW_REVISION"
+if [ "$INCREMENT_VERSION" = "true" ]; then
+  # Increment revision number
+  NEW_REVISION=$((REVISION + 1))
+  NEW_VERSION="$MAJOR.$MINOR.$BUILD.$NEW_REVISION"
 
-echo "New solution version: $NEW_VERSION"
+  echo "New solution version: $NEW_VERSION"
 
-# Update solution version online
-echo "Updating solution version to $NEW_VERSION..."
-pac solution online-version --solution-name "$APP_NAME" --solution-version "$NEW_VERSION"
+  # Update solution version online
+  echo "Updating solution version to $NEW_VERSION..."
+  pac solution online-version --solution-name "$APP_NAME" --solution-version "$NEW_VERSION"
+else
+  NEW_VERSION="$CURRENT_VERSION"
+  echo "Skipping version increment. Using current version: $NEW_VERSION"
+fi
 
 # Create target directory if it doesn't exist
 TARGET_DIR="./SolutionGroups/$SOLUTION_GROUP"
