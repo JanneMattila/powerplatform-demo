@@ -65,6 +65,16 @@ pac solution export \
 
 echo "Unmanaged solution exported successfully"
 
+echo "Unpacking unmanaged solution..."
+pac solution unpack \
+  --zipfile "$TARGET_DIR/${APP_NAME}_unmanaged.zip" \
+  --folder "$TARGET_DIR/${APP_NAME}_unmanaged" \
+  --allowDelete \
+  --allowWrite \
+  --clobber
+
+echo "Unmanaged solution unpacked successfully"
+
 # Export managed solution
 echo "Exporting managed solution..."
 pac solution export \
