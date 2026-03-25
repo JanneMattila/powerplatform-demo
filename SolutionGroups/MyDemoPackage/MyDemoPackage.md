@@ -4,10 +4,10 @@
 
 **Solution Group:** MyDemoPackage
 
-**Version:** 1.0.0.3
+**Version:** 1.0.0.4
 
-**Exported:** 2026-03-25 13:02:55 UTC
+**Exported:** 2026-03-25 13:12:56 UTC
 
 **Exported by:** runner
 
-**Branch:** main
+**Branch:** developers/janne
