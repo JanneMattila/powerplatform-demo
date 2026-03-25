@@ -23,6 +23,7 @@ on:
         required: true
         type: choice
         options:
+          - 'Development'
           - 'QA'
           - 'Stage'
           - 'Production'
@@ -174,8 +175,15 @@ jobs:
               echo "Environment: QA"
               echo "========================================"
               
-              # Pull only needed LFS files
+              # Pull needed LFS files for managed zip and unmanaged zip (for integrity check)
               git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
+              git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}_unmanaged.zip"
+              
+              # Verify solution integrity before deployment
+              chmod +x ./verify-solution-integrity.sh
+              ./verify-solution-integrity.sh \
+                "$SOLUTION_GROUP" \
+                "$APP_NAME"
               
               # Execute the deploy script
               chmod +x ./deploy-solution.sh
@@ -201,7 +209,7 @@ jobs:
           echo "========================================"
 
   OrchestrateManualDeploy:
-    if: github.event_name == 'workflow_dispatch' && (inputs.environment != 'Production' || github.ref == 'refs/heads/main')
+    if: github.event_name == 'workflow_dispatch' && (inputs.environment == 'Development' || inputs.environment != 'Production' || github.ref == 'refs/heads/main')
     environment: ${{ inputs.environment }}
     runs-on: ubuntu-latest
     name: Orchestrate ${{ inputs.environment || '' }} Deployment
@@ -307,11 +315,15 @@ jobs:
             echo "Environment: $ENVIRONMENT"
             echo "========================================"
             
-            # Pull only needed LFS files
-            git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
+            # Pull needed LFS files based on environment
+            if [ "$ENVIRONMENT" != "Development" ]; then
+              git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}.zip"
+              git lfs pull --include="SolutionGroups/$SOLUTION_GROUP/${APP_NAME}_unmanaged.zip"
+            fi
             
             # Execute the deploy script
             chmod +x ./deploy-solution.sh
+            chmod +x ./verify-solution-integrity.sh
             ./deploy-solution.sh \
               "$SOLUTION_GROUP" \
               "$APP_NAME" \
