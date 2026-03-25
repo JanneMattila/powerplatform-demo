@@ -9,15 +9,7 @@ on:
         required: true
         type: choice
         options:
-          - 'Calculator -> 1. Calculator'
-          - 'Library -> 1. LibraryTables'
-          - 'Library -> 2. LibraryApp'
-          - 'MyVacations -> 1. MyVacationsTables'
-          - 'MyVacations -> 2. MyVacationsApp'
-          - 'Garage -> 1. Garage'
-          - 'Demo -> 1. Demo1'
-          - 'Demo -> 2. Demo2'
-          - 'App -> 1. App1'
+          - 'MyDemoPackage -> 1. MyDemoPackage'
       environment:
         description: 'Target environment'
         required: true

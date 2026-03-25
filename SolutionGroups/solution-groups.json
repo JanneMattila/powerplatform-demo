@@ -1,41 +1,8 @@
 {
-    "Calculator": {
+    "MyDemoPackage": {
         "Configurations": {},
         "Solutions": [
-            "Calculator"
-        ]
-    },
-    "Library": {
-        "Configurations": {},
-        "Solutions": [
-            "LibraryTables",
-            "LibraryApp"
-        ]
-    },
-    "MyVacations": {
-        "Configurations": {},
-        "Solutions": [
-            "MyVacationsTables",
-            "MyVacationsApp"
-        ]
-    },
-    "Garage": {
-        "Configurations": {},
-        "Solutions": [
-            "Garage"
-        ]
-    },
-    "Demo": {
-        "Configurations": {},
-        "Solutions": [
-            "Demo1",
-            "Demo2"
-        ]
-    },
-    "App": {
-        "Configurations": {},
-        "Solutions": [
-            "App1"
+            "MyDemoPackage"
         ]
     }
 }
