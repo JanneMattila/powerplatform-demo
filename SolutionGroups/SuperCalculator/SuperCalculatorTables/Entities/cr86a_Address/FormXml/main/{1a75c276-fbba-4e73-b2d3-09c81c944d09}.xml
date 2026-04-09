@@ -1,0 +1,63 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<forms xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <systemform>
+    <formid>{1a75c276-fbba-4e73-b2d3-09c81c944d09}</formid>
+    <IntroducedVersion>1.0</IntroducedVersion>
+    <FormPresentation>1</FormPresentation>
+    <FormActivationState>1</FormActivationState>
+    <form>
+      <tabs>
+        <tab verticallayout="true" id="{54de9c83-b963-46cf-aa34-a521b5ff6b9e}" IsUserDefined="1">
+          <labels>
+            <label description="General" languagecode="1033" />
+          </labels>
+          <columns>
+            <column width="100%">
+              <sections>
+                <section showlabel="false" showbar="false" IsUserDefined="0" id="{62200bfa-b136-4849-8c27-7e904e42f261}">
+                  <labels>
+                    <label description="General" languagecode="1033" />
+                  </labels>
+                  <rows>
+                    <row>
+                      <cell id="{d1e3e431-6823-41de-8fe6-f8ba9e3270a8}">
+                        <labels>
+                          <label description="Address Line" languagecode="1033" />
+                        </labels>
+                        <control id="cr86a_addressline" classid="{4273EDBD-AC1D-40d3-9FB2-095C621B552D}" datafieldname="cr86a_addressline" />
+                      </cell>
+                    </row>
+                    <row>
+                      <cell id="{f7351800-087a-45e6-b818-39e03af672d1}">
+                        <labels>
+                          <label description="Owner" languagecode="1033" />
+                        </labels>
+                        <control id="ownerid" classid="{270BD3DB-D9AF-4782-9025-509E298DEC0A}" datafieldname="ownerid" />
+                      </cell>
+                    </row>
+                    <row>
+                      <cell id="{6acc00f8-6c01-4deb-afac-4a3f4e849bd4}">
+                        <labels>
+                          <label description="City" languagecode="1033" />
+                        </labels>
+                        <control id="cr86a_city" classid="{4273edbd-ac1d-40d3-9fb2-095c621b552d}" datafieldname="cr86a_city" />
+                      </cell>
+                    </row>
+                  </rows>
+                </section>
+              </sections>
+            </column>
+          </columns>
+        </tab>
+      </tabs>
+    </form>
+    <IsCustomizable>1</IsCustomizable>
+    <CanBeDeleted>1</CanBeDeleted>
+    <LocalizedNames>
+      <LocalizedName description="Information" languagecode="1033" />
+    </LocalizedNames>
+    <Descriptions>
+      <Description description="A form for this entity." languagecode="1033" />
+    </Descriptions>
+  </systemform>
+</forms>
