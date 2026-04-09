@@ -4,5 +4,12 @@
         "Solutions": [
             "MyDemoPackage"
         ]
-    }
+    },
+    "SuperCalculator": {
+        "Configurations": {},
+        "Solutions": [
+            "SuperCalculatorTables",
+            "SuperCalculatorApps"
+        ]
+    }    
 }
