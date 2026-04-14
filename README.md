@@ -471,3 +471,35 @@ The Deploy Solutions workflow is automatically triggered when solution files are
 - Verify the order in `solution-groups.json` matches your dependency requirements
 - Solutions are deployed in array order (top to bottom)
 - Foundation solutions (tables) should be listed before apps that depend on them
+
+## Example Branching and Workflow Execution
+
+```powershell
+# Make sure that you use main branch
+git checkout main
+
+# Get latest source files from GitHub to your local machine
+git pull
+
+# Create a new branch
+git checkout -b developers/developer1
+
+# Edit files
+
+# Check the status of the files
+git status
+
+# Stage the changed files
+git add .
+
+# Check the status of the files to see that they are staged
+git status
+
+# Commit the changes
+git commit -m "Update documentation to include git instructions for developers"
+
+# Push the branch to GitHub
+git push
+```
+
+Create a pull request from `developers/developer1` to `main` to trigger the workflows.
