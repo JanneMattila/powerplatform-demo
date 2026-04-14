@@ -486,14 +486,20 @@ git checkout -b developers/developer1
 
 # Edit files
 
+# Check the status of the files
+git status
+
 # Stage the changed files
 git add .
 
+# Check the status of the files to see that they are staged
+git status
+
 # Commit the changes
-git commit -m "Updated solution group options in workflow files"
+git commit -m "Update documentation to include git instructions for developers"
 
 # Push the branch to GitHub
-git push -u origin developers/developer1
+git push
 ```
 
 Create a pull request from `developers/developer1` to `main` to trigger the workflows.
