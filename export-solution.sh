@@ -25,7 +25,8 @@ SOLUTION_LIST=$(pac solution list)
 
 # Parse the table output to find the solution and extract version
 # Table format: Unique Name | Friendly Name | Version | Managed
-CURRENT_VERSION=$(echo "$SOLUTION_LIST" | grep "^$APP_NAME\s" | awk '{print $3}')
+# Friendly Name may contain spaces, so read Version as second-to-last field.
+CURRENT_VERSION=$(echo "$SOLUTION_LIST" | grep "^$APP_NAME\s" | awk '{print $(NF-1)}')
 
 if [ -z "$CURRENT_VERSION" ]; then
   echo "Error: Could not find solution '$APP_NAME'"
