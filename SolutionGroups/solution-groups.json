@@ -11,5 +11,11 @@
             "SuperCalculatorTables",
             "SuperCalculatorApps"
         ]
-    }    
+    },
+    "Super & Duper megapack": {
+        "Configurations": {},
+        "Solutions": [
+            "Super & Duper megapack"
+        ]
+    }
 }
