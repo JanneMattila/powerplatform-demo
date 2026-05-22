@@ -12,7 +12,7 @@ on:
           - 'MyDemoPackage -> 1. MyDemoPackage'
           - 'SuperCalculator -> 1. SuperCalculatorTables'
           - 'SuperCalculator -> 2. SuperCalculatorApps'
-          - 'Super & Duper megapack -> 1. Super & Duper megapack'
+          - 'SuperDupermegapack -> 1. SuperDupermegapack'
       branch_name:
         description: 'Branch name for export (e.g., "features/app-export"). Leave empty for auto-generated name with timestamp.'
         required: false

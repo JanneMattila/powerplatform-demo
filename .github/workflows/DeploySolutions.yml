@@ -12,7 +12,7 @@ on:
           - 'MyDemoPackage -> 1. MyDemoPackage'
           - 'SuperCalculator -> 1. SuperCalculatorTables'
           - 'SuperCalculator -> 2. SuperCalculatorApps'
-          - 'Super & Duper megapack -> 1. Super & Duper megapack'
+          - 'SuperDupermegapack -> 1. SuperDupermegapack'
       environment:
         description: 'Target environment'
         required: true
