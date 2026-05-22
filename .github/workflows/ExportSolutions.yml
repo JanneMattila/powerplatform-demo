@@ -109,9 +109,8 @@ jobs:
         id: parse
         run: |
           SOLUTION="${{ inputs.solution }}"
-          # Split on " -> " delimiter (group names may contain spaces and '&')
-          SOLUTION_GROUP="${SOLUTION%% -> *}"
-          APP_NAME="${SOLUTION#* -> }"
+          SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
+          APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
           # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
           APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
           echo "solution_group=$SOLUTION_GROUP" >> $GITHUB_OUTPUT

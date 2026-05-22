@@ -104,8 +104,7 @@ jobs:
           
           # Sort by solution group and index, then build JSON array in correct order
           SOLUTIONS="[]"
-          while IFS= read -r KEY; do
-            [ -z "$KEY" ] && continue
+          for KEY in $(printf '%s\n' "${!SOLUTION_MAP[@]}" | sort); do
             VALUE="${SOLUTION_MAP[$KEY]}"
             SOLUTION_GROUP=$(echo "$VALUE" | cut -d'|' -f1)
             APP_NAME=$(echo "$VALUE" | cut -d'|' -f2)
@@ -113,7 +112,7 @@ jobs:
             
             # Add to solutions array in order (use -c for compact output)
             SOLUTIONS=$(echo "$SOLUTIONS" | jq -c --arg sg "$SOLUTION_GROUP" --arg app "$APP_NAME" --argjson idx "$INDEX" '. += [{"solution_group": $sg, "app_name": $app, "order": $idx}]')
-          done < <(printf '%s\n' "${!SOLUTION_MAP[@]}" | sort)
+          done
           
           echo "solutions=$SOLUTIONS" >> $GITHUB_OUTPUT
           echo "Detected solutions in deployment order:"
@@ -142,8 +141,7 @@ jobs:
           UNIQUE_GROUPS=$(echo "$SOLUTIONS" | jq -r '[.[].solution_group] | unique | .[]')
           DEPLOYED_COUNT=0
 
-          while IFS= read -r SOLUTION_GROUP; do
-            [ -z "$SOLUTION_GROUP" ] && continue
+          for SOLUTION_GROUP in $UNIQUE_GROUPS; do
             # Resolve environment URL for this solution group
             CONFIG_ENV_URL=$(echo "$SOLUTION_GROUPS_JSON" | jq -r --arg sg "$SOLUTION_GROUP" '.[$sg].Configurations.QA.Environment // empty')
             TARGET_ENV_URL="${CONFIG_ENV_URL:-${{ secrets.ENVIRONMENT_URL }}}"
@@ -198,7 +196,7 @@ jobs:
             done
 
             pac auth clear
-          done <<< "$UNIQUE_GROUPS"
+          done
           
           echo ""
           echo "========================================"
@@ -227,9 +225,8 @@ jobs:
         id: parse
         run: |
           SOLUTION="${{ inputs.solution }}"
-          # Split on " -> " delimiter (group names may contain spaces and '&')
-          SOLUTION_GROUP="${SOLUTION%% -> *}"
-          APP_NAME="${SOLUTION#* -> }"
+          SOLUTION_GROUP=$(echo "$SOLUTION" | cut -d' ' -f1)
+          APP_NAME=$(echo "$SOLUTION" | cut -d' ' -f3-)
           # Remove number prefix if present (e.g., "1. LibraryTables" -> "LibraryTables")
           APP_NAME=$(echo "$APP_NAME" | sed 's/^[0-9]\+\. //')
           echo "solution_group=$SOLUTION_GROUP" >> $GITHUB_OUTPUT
