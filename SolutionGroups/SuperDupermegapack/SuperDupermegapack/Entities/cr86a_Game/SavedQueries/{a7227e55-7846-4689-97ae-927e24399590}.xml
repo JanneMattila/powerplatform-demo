@@ -1,0 +1,42 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<savedqueries xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <savedquery>
+    <IsCustomizable>1</IsCustomizable>
+    <CanBeDeleted>0</CanBeDeleted>
+    <isquickfindquery>0</isquickfindquery>
+    <isprivate>0</isprivate>
+    <isdefault>1</isdefault>
+    <savedqueryid>{a7227e55-7846-4689-97ae-927e24399590}</savedqueryid>
+    <layoutxml>
+      <grid name="resultset" jump="cr86a_gamename" select="1" icon="1" preview="1">
+        <row name="result" id="cr86a_gameid">
+          <cell name="cr86a_gamename" width="300" />
+          <cell name="cr86a_gamedate" width="150" />
+          <cell name="cr86a_hometeam" width="150" />
+          <cell name="cr86a_awayteam" width="150" />
+        </row>
+      </grid>
+    </layoutxml>
+    <querytype>0</querytype>
+    <fetchxml>
+      <fetch version="1.0" mapping="logical">
+        <entity name="cr86a_game">
+          <attribute name="cr86a_gameid" />
+          <attribute name="cr86a_gamename" />
+          <attribute name="createdon" />
+          <order attribute="cr86a_gamename" descending="false" />
+          <filter type="and">
+            <condition attribute="statecode" operator="eq" value="0" />
+          </filter>
+          <attribute name="cr86a_gamedate" />
+          <attribute name="cr86a_hometeam" />
+          <attribute name="cr86a_awayteam" />
+        </entity>
+      </fetch>
+    </fetchxml>
+    <IntroducedVersion>1.0</IntroducedVersion>
+    <LocalizedNames>
+      <LocalizedName description="Active Games" languagecode="1033" />
+    </LocalizedNames>
+  </savedquery>
+</savedqueries>
