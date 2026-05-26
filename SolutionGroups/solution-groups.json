@@ -17,5 +17,11 @@
         "Solutions": [
             "SuperDupermegapack"
         ]
+    },
+    "NUM1234_Test": {
+        "Configurations": {},
+        "Solutions": [
+            "NUM1234_Test"
+        ]
     }
 }

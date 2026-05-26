@@ -13,6 +13,7 @@ on:
           - 'SuperCalculator -> 1. SuperCalculatorTables'
           - 'SuperCalculator -> 2. SuperCalculatorApps'
           - 'SuperDupermegapack -> 1. SuperDupermegapack'
+          - 'NUM1234_Test -> 1. NUM1234_Test'
       environment:
         description: 'Target environment'
         required: true
