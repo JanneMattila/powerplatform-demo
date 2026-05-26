@@ -37,7 +37,14 @@ Assign the service principal as an application user in the target Power Platform
 > [!IMPORTANT]
 > Note: You can have **application users** per environment or use the **same application user** across multiple environments.
 
-Allow GitHub Actions to trigger workflows:
+Remember to assign the appropriate security roles to the service principal
+application user in each environment to ensure it has the necessary permissions to perform deployments:
+
+![Service principal security roles](./images/environments-security-roles.png)
+
+---
+
+Allow GitHub Actions to trigger workflows - Settings > Actions > General > Workflow permissions:
 
 ![GitHub Actions settings](./images/github-pr-permissions.png)
 
