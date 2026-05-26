@@ -1,0 +1,79 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<forms xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <systemform>
+    <formid>{0312d170-1a48-47b0-97bf-4997639cf7a0}</formid>
+    <IntroducedVersion>1.0</IntroducedVersion>
+    <FormPresentation>1</FormPresentation>
+    <FormActivationState>1</FormActivationState>
+    <form>
+      <tabs>
+        <tab verticallayout="true" id="{ffef919d-6187-4e90-a05c-c38b9e748569}" IsUserDefined="1">
+          <labels>
+            <label description="General" languagecode="1033" />
+          </labels>
+          <columns>
+            <column width="100%">
+              <sections>
+                <section showlabel="false" showbar="false" IsUserDefined="0" id="{a32cc53c-c589-4ed1-824c-cf966614ff4a}">
+                  <labels>
+                    <label description="General" languagecode="1033" />
+                  </labels>
+                  <rows>
+                    <row>
+                      <cell id="{f0ffd621-9869-42aa-afb1-c15a702efb8b}">
+                        <labels>
+                          <label description="Round Name" languagecode="1033" />
+                        </labels>
+                        <control id="cr86a_roundname" classid="{4273EDBD-AC1D-40d3-9FB2-095C621B552D}" datafieldname="cr86a_roundname" />
+                      </cell>
+                    </row>
+                    <row>
+                      <cell id="{78a7bd2c-bc67-4c98-bc22-d9818609a6f4}">
+                        <labels>
+                          <label description="Owner" languagecode="1033" />
+                        </labels>
+                        <control id="ownerid" classid="{270BD3DB-D9AF-4782-9025-509E298DEC0A}" datafieldname="ownerid" />
+                      </cell>
+                    </row>
+                    <row>
+                      <cell id="{4b6c8431-a1c4-45fc-b80a-631f51615d09}">
+                        <labels>
+                          <label description="Score" languagecode="1033" />
+                        </labels>
+                        <control id="cr86a_score" classid="{c6d124ca-7eda-4a60-aea9-7fb8d318b68f}" datafieldname="cr86a_score" />
+                      </cell>
+                    </row>
+                    <row>
+                      <cell id="{b1e78c49-0ec6-463c-b220-c3d10ec0fa0f}">
+                        <labels>
+                          <label description="Date Played" languagecode="1033" />
+                        </labels>
+                        <control id="cr86a_dateplayed" classid="{5b773807-9fb2-42db-97c3-7a91eff8adff}" datafieldname="cr86a_dateplayed" />
+                      </cell>
+                    </row>
+                    <row>
+                      <cell id="{e176633d-6172-4133-841a-1cc5e4269e4e}">
+                        <labels>
+                          <label description="Player" languagecode="1033" />
+                        </labels>
+                        <control id="cr86a_playerid" classid="{270bd3db-d9af-4782-9025-509e298dec0a}" datafieldname="cr86a_playerid" />
+                      </cell>
+                    </row>
+                  </rows>
+                </section>
+              </sections>
+            </column>
+          </columns>
+        </tab>
+      </tabs>
+    </form>
+    <IsCustomizable>1</IsCustomizable>
+    <CanBeDeleted>1</CanBeDeleted>
+    <LocalizedNames>
+      <LocalizedName description="Information" languagecode="1033" />
+    </LocalizedNames>
+    <Descriptions>
+      <Description description="A form for this entity." languagecode="1033" />
+    </Descriptions>
+  </systemform>
+</forms>
