@@ -1,0 +1,38 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<savedqueries xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <savedquery>
+    <IsCustomizable>1</IsCustomizable>
+    <CanBeDeleted>0</CanBeDeleted>
+    <isquickfindquery>0</isquickfindquery>
+    <isprivate>0</isprivate>
+    <isdefault>1</isdefault>
+    <savedqueryid>{89649547-8ff9-40a8-ba2b-b73e54134970}</savedqueryid>
+    <layoutxml>
+      <grid name="resultset" jump="cr86a_playername" select="1" icon="1" preview="1">
+        <row name="result" id="cr86a_playerid">
+          <cell name="cr86a_playername" width="300" />
+          <cell name="cr86a_country" width="150" />
+        </row>
+      </grid>
+    </layoutxml>
+    <querytype>0</querytype>
+    <fetchxml>
+      <fetch version="1.0" mapping="logical">
+        <entity name="cr86a_player">
+          <attribute name="cr86a_playerid" />
+          <attribute name="cr86a_playername" />
+          <attribute name="createdon" />
+          <order attribute="cr86a_playername" descending="false" />
+          <filter type="and">
+            <condition attribute="statecode" operator="eq" value="0" />
+          </filter>
+          <attribute name="cr86a_country" />
+        </entity>
+      </fetch>
+    </fetchxml>
+    <IntroducedVersion>1.0</IntroducedVersion>
+    <LocalizedNames>
+      <LocalizedName description="Active Players" languagecode="1033" />
+    </LocalizedNames>
+  </savedquery>
+</savedqueries>

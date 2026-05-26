@@ -1,0 +1,16 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<EntityRelationships xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <EntityRelationship Name="business_unit_cr86a_golfresult" />
+  <EntityRelationship Name="business_unit_cr86a_player" />
+  <EntityRelationship Name="cr86a_GolfResult_cr86a_Player" />
+  <EntityRelationship Name="lk_cr86a_golfresult_createdby" />
+  <EntityRelationship Name="lk_cr86a_golfresult_modifiedby" />
+  <EntityRelationship Name="lk_cr86a_player_createdby" />
+  <EntityRelationship Name="lk_cr86a_player_modifiedby" />
+  <EntityRelationship Name="owner_cr86a_golfresult" />
+  <EntityRelationship Name="owner_cr86a_player" />
+  <EntityRelationship Name="team_cr86a_golfresult" />
+  <EntityRelationship Name="team_cr86a_player" />
+  <EntityRelationship Name="user_cr86a_golfresult" />
+  <EntityRelationship Name="user_cr86a_player" />
+</EntityRelationships>
