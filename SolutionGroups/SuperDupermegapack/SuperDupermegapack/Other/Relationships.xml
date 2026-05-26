@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<EntityRelationships xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <EntityRelationship Name="business_unit_cr86a_game" />
+  <EntityRelationship Name="business_unit_cr86a_team" />
+  <EntityRelationship Name="cr86a_Game_cr86a_Team" />
+  <EntityRelationship Name="cr86a_Game_cr86a_Team1" />
+  <EntityRelationship Name="lk_cr86a_game_createdby" />
+  <EntityRelationship Name="lk_cr86a_game_modifiedby" />
+  <EntityRelationship Name="lk_cr86a_team_createdby" />
+  <EntityRelationship Name="lk_cr86a_team_modifiedby" />
+  <EntityRelationship Name="owner_cr86a_game" />
+  <EntityRelationship Name="owner_cr86a_team" />
+  <EntityRelationship Name="team_cr86a_game" />
+  <EntityRelationship Name="team_cr86a_team" />
+  <EntityRelationship Name="user_cr86a_game" />
+  <EntityRelationship Name="user_cr86a_team" />
+</EntityRelationships>
