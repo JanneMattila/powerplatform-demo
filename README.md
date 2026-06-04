@@ -452,6 +452,137 @@ The Deploy Solutions workflow is automatically triggered when solution files are
 - Clear audit trail through pull request history
 - Dependency order automatically maintained
 
+## Deployment Settings (Environment Variables and Connection References)
+
+When deploying managed solutions to QA, Stage, or Production environments, you often need to configure **environment variables** and **connection references** that differ per environment. The deployment script supports this through **deployment settings files**.
+
+For full details on the deployment settings file format, see: [Pre-populate connection references and environment variables for automated deployments using Power Platform Build Tools](https://learn.microsoft.com/en-us/power-platform/alm/conn-ref-env-variables-build-tools)
+
+### How It Works
+
+The `deploy-solution.sh` script automatically looks for a deployment settings file using this naming convention:
+
+```
+SolutionGroups/<SolutionGroup>/<SolutionName>.<Environment>.json
+```
+
+For example:
+- `SolutionGroups/Library/LibraryApp.QA.json` — settings for QA deployment
+- `SolutionGroups/Library/LibraryApp.Stage.json` — settings for Stage deployment
+- `SolutionGroups/Library/LibraryApp.Production.json` — settings for Production deployment
+
+If the file exists, it is automatically passed to `pac solution import --settings-file`. If no settings file is found, the solution is imported without environment-specific overrides.
+
+### Example Directory Structure
+
+```
+SolutionGroups/
+└── Library/
+    ├── LibraryApp.zip
+    ├── LibraryApp_unmanaged.zip
+    ├── LibraryApp/
+    ├── LibraryApp.md
+    ├── LibraryApp.QA.json              # Deployment settings for QA
+    ├── LibraryApp.Stage.json           # Deployment settings for Stage
+    ├── LibraryApp.Production.json      # Deployment settings for Production
+    ├── LibraryTables.zip
+    └── ...
+```
+
+### Example Deployment Settings File
+
+Below is an example `LibraryApp.Production.json` that configures environment variables and connection references:
+
+```json
+{
+  "EnvironmentVariables": [
+    {
+      "SchemaName": "new_LibraryApiBaseUrl",
+      "Value": "https://api.production.contoso.com"
+    },
+    {
+      "SchemaName": "new_LibraryNotificationEmail",
+      "Value": "notifications@contoso.com"
+    },
+    {
+      "SchemaName": "new_EnableDetailedLogging",
+      "Value": "false"
+    }
+  ],
+  "ConnectionReferences": [
+    {
+      "LogicalName": "new_SharedSharePointConnection",
+      "ConnectionId": "00000000-0000-0000-0000-000000000001",
+      "ConnectorId": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline"
+    },
+    {
+      "LogicalName": "new_SharedDataverseConnection",
+      "ConnectionId": "00000000-0000-0000-0000-000000000002",
+      "ConnectorId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+    }
+  ]
+}
+```
+
+### Configuration Details
+
+**Environment Variables (`EnvironmentVariables`):**
+| Field | Description |
+|---|---|
+| `SchemaName` | The schema name of the environment variable as defined in the solution |
+| `Value` | The value to set for this environment in the target environment |
+
+**Connection References (`ConnectionReferences`):**
+| Field | Description |
+|---|---|
+| `LogicalName` | The logical name of the connection reference in the solution |
+| `ConnectionId` | The ID of an existing connection in the target environment |
+| `ConnectorId` | The connector identifier (e.g., `/providers/Microsoft.PowerApps/apis/shared_sharepointonline`) |
+
+### Per-Environment Example
+
+Here is how you might configure different values across environments:
+
+**LibraryApp.QA.json:**
+```json
+{
+  "EnvironmentVariables": [
+    {
+      "SchemaName": "new_LibraryApiBaseUrl",
+      "Value": "https://api.qa.contoso.com"
+    },
+    {
+      "SchemaName": "new_EnableDetailedLogging",
+      "Value": "true"
+    }
+  ]
+}
+```
+
+**LibraryApp.Production.json:**
+```json
+{
+  "EnvironmentVariables": [
+    {
+      "SchemaName": "new_LibraryApiBaseUrl",
+      "Value": "https://api.production.contoso.com"
+    },
+    {
+      "SchemaName": "new_EnableDetailedLogging",
+      "Value": "false"
+    }
+  ]
+}
+```
+
+### Tips
+
+- **Development deployments** do not use deployment settings files — source files are imported as unmanaged directly
+- You can include only `EnvironmentVariables`, only `ConnectionReferences`, or both in the same file
+- Connection IDs must reference **existing connections** in the target environment — create connections manually before deploying
+- Store deployment settings files in the repository alongside the solution files so they are version-controlled
+- Use the `SchemaName` (not `DisplayName`) for environment variables — find it in the solution's environment variable definition
+
 ## Troubleshooting
 
 ### Workflow fails with "Solution not found in Power Platform"
