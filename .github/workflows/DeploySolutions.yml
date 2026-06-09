@@ -135,6 +135,49 @@ jobs:
           
           echo "Will deploy $SOLUTION_COUNT solution(s) to QA"
 
+          # Validate Power Platform authentication secrets
+          echo "Validating authentication secrets..."
+          VALIDATION_ERRORS=0
+          GUID_REGEX='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+
+          CLIENT_ID="${{ secrets.CLIENT_ID }}"
+          TENANT_ID="${{ secrets.TENANT_ID }}"
+          CLIENT_SECRET="${{ secrets.CLIENT_SECRET }}"
+
+          # Validate CLIENT_ID (must be a GUID)
+          if [ -z "$CLIENT_ID" ]; then
+            echo "::error::Secret 'CLIENT_ID' is not set. Please add it to the repository/environment secrets."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          elif ! [[ "$CLIENT_ID" =~ $GUID_REGEX ]]; then
+            echo "::error::Secret 'CLIENT_ID' must be a valid GUID (e.g. 00000000-0000-0000-0000-000000000000), 36 characters long. Current length: ${#CLIENT_ID}."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          fi
+
+          # Validate TENANT_ID (must be a GUID)
+          if [ -z "$TENANT_ID" ]; then
+            echo "::error::Secret 'TENANT_ID' is not set. Please add it to the repository/environment secrets."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          elif ! [[ "$TENANT_ID" =~ $GUID_REGEX ]]; then
+            echo "::error::Secret 'TENANT_ID' must be a valid GUID (e.g. 00000000-0000-0000-0000-000000000000), 36 characters long. Current length: ${#TENANT_ID}."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          fi
+
+          # Validate CLIENT_SECRET (must not be empty or contain line breaks)
+          if [ -z "$CLIENT_SECRET" ]; then
+            echo "::error::Secret 'CLIENT_SECRET' is not set or empty. Please add it to the repository/environment secrets."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          elif [ "$(printf '%s' "$CLIENT_SECRET" | wc -l)" -ne 0 ]; then
+            echo "::error::Secret 'CLIENT_SECRET' must not contain line breaks. Please re-enter the secret value on a single line."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          fi
+
+          if [ "$VALIDATION_ERRORS" -ne 0 ]; then
+            echo "::error::Authentication secret validation failed with $VALIDATION_ERRORS error(s). Please fix the secrets listed above and re-run the workflow."
+            exit 1
+          fi
+
+          echo "All authentication secrets validated successfully."
+
           # Read solution-groups.json for environment URL overrides
           SOLUTION_GROUPS_JSON=$(cat SolutionGroups/solution-groups.json)
 
@@ -147,13 +190,27 @@ jobs:
             CONFIG_ENV_URL=$(echo "$SOLUTION_GROUPS_JSON" | jq -r --arg sg "$SOLUTION_GROUP" '.[$sg].Configurations.QA.Environment // empty')
             TARGET_ENV_URL="${CONFIG_ENV_URL:-${{ secrets.ENVIRONMENT_URL }}}"
 
+            # Validate the resolved environment URL before authenticating
+            if [ -z "$TARGET_ENV_URL" ]; then
+              echo "::error::Environment URL for solution group '$SOLUTION_GROUP' is empty. Set 'Configurations.QA.Environment' in solution-groups.json or the 'ENVIRONMENT_URL' secret."
+              exit 1
+            fi
+            if [ "$(printf '%s' "$TARGET_ENV_URL" | wc -l)" -ne 0 ]; then
+              echo "::error::Environment URL for solution group '$SOLUTION_GROUP' must not contain line breaks. Please fix the configured value."
+              exit 1
+            fi
+            if [[ "$TARGET_ENV_URL" != https://* ]]; then
+              echo "::error::Environment URL for solution group '$SOLUTION_GROUP' must start with 'https://' (e.g. https://yourorg.crm.dynamics.com). Current value: '$TARGET_ENV_URL'."
+              exit 1
+            fi
+
             # Authenticate with Power Platform for this solution group
             echo "Authenticating with Power Platform ($TARGET_ENV_URL)..."
             pac auth create \
             --environment "$TARGET_ENV_URL" \
-            --applicationId "${{ secrets.CLIENT_ID }}" \
-            --clientSecret "${{ secrets.CLIENT_SECRET }}" \
-            --tenant "${{ secrets.TENANT_ID }}" \
+            --applicationId "$CLIENT_ID" \
+            --clientSecret "$CLIENT_SECRET" \
+            --tenant "$TENANT_ID" \
             --accept-cleartext-caching
 
             # Get solutions for this group in order
@@ -290,13 +347,71 @@ jobs:
           CONFIG_ENV_URL=$(echo "$SOLUTION_GROUPS" | jq -r --arg sg "$SOLUTION_GROUP" --arg env "$ENVIRONMENT" '.[$sg].Configurations[$env].Environment // empty')
           TARGET_ENV_URL="${CONFIG_ENV_URL:-${{ secrets.ENVIRONMENT_URL }}}"
 
+          # Validate Power Platform authentication secrets
+          echo "Validating authentication secrets..."
+          VALIDATION_ERRORS=0
+          GUID_REGEX='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+
+          CLIENT_ID="${{ secrets.CLIENT_ID }}"
+          TENANT_ID="${{ secrets.TENANT_ID }}"
+          CLIENT_SECRET="${{ secrets.CLIENT_SECRET }}"
+
+          # Validate CLIENT_ID (must be a GUID)
+          if [ -z "$CLIENT_ID" ]; then
+            echo "::error::Secret 'CLIENT_ID' is not set. Please add it to the repository/environment secrets."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          elif ! [[ "$CLIENT_ID" =~ $GUID_REGEX ]]; then
+            echo "::error::Secret 'CLIENT_ID' must be a valid GUID (e.g. 00000000-0000-0000-0000-000000000000), 36 characters long. Current length: ${#CLIENT_ID}."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          fi
+
+          # Validate TENANT_ID (must be a GUID)
+          if [ -z "$TENANT_ID" ]; then
+            echo "::error::Secret 'TENANT_ID' is not set. Please add it to the repository/environment secrets."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          elif ! [[ "$TENANT_ID" =~ $GUID_REGEX ]]; then
+            echo "::error::Secret 'TENANT_ID' must be a valid GUID (e.g. 00000000-0000-0000-0000-000000000000), 36 characters long. Current length: ${#TENANT_ID}."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          fi
+
+          # Validate CLIENT_SECRET (must not be empty or contain line breaks)
+          if [ -z "$CLIENT_SECRET" ]; then
+            echo "::error::Secret 'CLIENT_SECRET' is not set or empty. Please add it to the repository/environment secrets."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          elif [ "$(printf '%s' "$CLIENT_SECRET" | wc -l)" -ne 0 ]; then
+            echo "::error::Secret 'CLIENT_SECRET' must not contain line breaks. Please re-enter the secret value on a single line."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          fi
+
+          # Validate the resolved environment URL (config override or ENVIRONMENT_URL secret)
+          if [ -z "$TARGET_ENV_URL" ]; then
+            echo "::error::Environment URL is empty. Set 'Configurations.$ENVIRONMENT.Environment' in solution-groups.json or the 'ENVIRONMENT_URL' secret."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          else
+            if [ "$(printf '%s' "$TARGET_ENV_URL" | wc -l)" -ne 0 ]; then
+              echo "::error::Environment URL must not contain line breaks. Please fix the configured value."
+              VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+            fi
+            if [[ "$TARGET_ENV_URL" != https://* ]]; then
+              echo "::error::Environment URL must start with 'https://' (e.g. https://yourorg.crm.dynamics.com). Current value: '$TARGET_ENV_URL'."
+              VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+            fi
+          fi
+
+          if [ "$VALIDATION_ERRORS" -ne 0 ]; then
+            echo "::error::Authentication secret validation failed with $VALIDATION_ERRORS error(s). Please fix the secrets/configuration listed above and re-run the workflow."
+            exit 1
+          fi
+
+          echo "All authentication secrets validated successfully."
+
           # Authenticate with Power Platform
           echo "Authenticating with Power Platform ($TARGET_ENV_URL)..."
           pac auth create \
           --environment "$TARGET_ENV_URL" \
-          --applicationId "${{ secrets.CLIENT_ID }}" \
-          --clientSecret "${{ secrets.CLIENT_SECRET }}" \
-          --tenant "${{ secrets.TENANT_ID }}" \
+          --applicationId "$CLIENT_ID" \
+          --clientSecret "$CLIENT_SECRET" \
+          --tenant "$TENANT_ID" \
           --accept-cleartext-caching
 
           # Deploy each app sequentially

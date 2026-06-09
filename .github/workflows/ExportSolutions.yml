@@ -168,13 +168,72 @@ jobs:
           TOTAL_COUNT=${#APPS_TO_EXPORT[@]}
           echo "Will export $TOTAL_COUNT app(s): ${APPS_TO_EXPORT[*]}"
           
+          # Validate Power Platform authentication secrets
+          echo "Validating authentication secrets..."
+          VALIDATION_ERRORS=0
+          GUID_REGEX='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+
+          CLIENT_ID="${{ secrets.CLIENT_ID }}"
+          TENANT_ID="${{ secrets.TENANT_ID }}"
+          CLIENT_SECRET="${{ secrets.CLIENT_SECRET }}"
+          ENVIRONMENT_URL="${{ secrets.ENVIRONMENT_URL }}"
+
+          # Validate CLIENT_ID (must be a GUID)
+          if [ -z "$CLIENT_ID" ]; then
+            echo "::error::Secret 'CLIENT_ID' is not set. Please add it to the repository/environment secrets."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          elif ! [[ "$CLIENT_ID" =~ $GUID_REGEX ]]; then
+            echo "::error::Secret 'CLIENT_ID' must be a valid GUID (e.g. 00000000-0000-0000-0000-000000000000), 36 characters long. Current length: ${#CLIENT_ID}."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          fi
+
+          # Validate TENANT_ID (must be a GUID)
+          if [ -z "$TENANT_ID" ]; then
+            echo "::error::Secret 'TENANT_ID' is not set. Please add it to the repository/environment secrets."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          elif ! [[ "$TENANT_ID" =~ $GUID_REGEX ]]; then
+            echo "::error::Secret 'TENANT_ID' must be a valid GUID (e.g. 00000000-0000-0000-0000-000000000000), 36 characters long. Current length: ${#TENANT_ID}."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          fi
+
+          # Validate CLIENT_SECRET (must not be empty or contain line breaks)
+          if [ -z "$CLIENT_SECRET" ]; then
+            echo "::error::Secret 'CLIENT_SECRET' is not set or empty. Please add it to the repository/environment secrets."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          elif [ "$(printf '%s' "$CLIENT_SECRET" | wc -l)" -ne 0 ]; then
+            echo "::error::Secret 'CLIENT_SECRET' must not contain line breaks. Please re-enter the secret value on a single line."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          fi
+
+          # Validate ENVIRONMENT_URL (must be non-empty, start with https:// and not contain line breaks)
+          if [ -z "$ENVIRONMENT_URL" ]; then
+            echo "::error::Secret 'ENVIRONMENT_URL' is not set or empty. Please add it to the repository/environment secrets."
+            VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+          else
+            if [ "$(printf '%s' "$ENVIRONMENT_URL" | wc -l)" -ne 0 ]; then
+              echo "::error::Secret 'ENVIRONMENT_URL' must not contain line breaks. Please re-enter the secret value on a single line."
+              VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+            fi
+            if [[ "$ENVIRONMENT_URL" != https://* ]]; then
+              echo "::error::Secret 'ENVIRONMENT_URL' must start with 'https://' (e.g. https://yourorg.crm.dynamics.com)."
+              VALIDATION_ERRORS=$((VALIDATION_ERRORS + 1))
+            fi
+          fi
+
+          if [ "$VALIDATION_ERRORS" -ne 0 ]; then
+            echo "::error::Authentication secret validation failed with $VALIDATION_ERRORS error(s). Please fix the secrets listed above and re-run the workflow."
+            exit 1
+          fi
+
+          echo "All authentication secrets validated successfully."
+
           # Authenticate with Power Platform
           echo "Authenticating with Power Platform..."
           pac auth create \
-          --environment "${{ secrets.ENVIRONMENT_URL }}" \
-          --applicationId "${{ secrets.CLIENT_ID }}" \
-          --clientSecret "${{ secrets.CLIENT_SECRET }}" \
-          --tenant "${{ secrets.TENANT_ID }}" \
+          --environment "$ENVIRONMENT_URL" \
+          --applicationId "$CLIENT_ID" \
+          --clientSecret "$CLIENT_SECRET" \
+          --tenant "$TENANT_ID" \
           --accept-cleartext-caching
 
           # Export each app sequentially
