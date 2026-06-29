@@ -23,10 +23,24 @@ echo "=========================================="
 echo "Getting current solution version..."
 SOLUTION_LIST=$(pac solution list)
 
-# Parse the table output to find the solution and extract version
+# Parse the table output to find the solution and extract version.
 # Table format: Unique Name | Friendly Name | Version | Managed
-# Friendly Name may contain spaces, so read Version as second-to-last field.
-CURRENT_VERSION=$(echo "$SOLUTION_LIST" | grep "^$APP_NAME\s" | awk '{print $(NF-1)}')
+# The columns are fixed-width and the headers are aligned, so use the header
+# positions to slice each row: the version lives between the start of the
+# "Version" header and the start of the "Managed" header. This is robust even
+# when the friendly name contains spaces. CRLF is stripped to avoid corruption.
+CURRENT_VERSION=$(echo "$SOLUTION_LIST" | tr -d '\r' | awk -v name="$APP_NAME" '
+  ver_start == 0 && /Unique Name/ && /Version/ {
+    ver_start = index($0, "Version")
+    ver_end = index($0, "Managed")
+    next
+  }
+  ver_start > 0 && $1 == name {
+    v = substr($0, ver_start, ver_end - ver_start)
+    gsub(/^ +| +$/, "", v)
+    print v
+    exit
+  }')
 
 if [ -z "$CURRENT_VERSION" ]; then
   echo "Error: Could not find solution '$APP_NAME'"
